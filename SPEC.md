@@ -84,7 +84,21 @@ AssetDesk/
     assetdesk.db                  # gitignored
 ```
 
-Add `data/` to `.gitignore`.
+Create `AssetDesk/.gitignore` ignoring the build output and the database **by name**:
+
+```
+bin/
+obj/
+assetdesk.db
+assetdesk.db-shm
+assetdesk.db-wal
+```
+
+Do **not** put `data/` in `.gitignore`. On a case-insensitive filesystem — the macOS default — `Data/`
+(the source folder listed above) and `data/` (the database folder) are the same physical directory, so
+a `data/` rule also matches `Data/Models.cs`, `Db.cs`, `AssetRepository.cs` and `Format.cs`. The whole
+data layer disappears from `git status` and stops being committed, while the build keeps succeeding.
+Ignoring the three sqlite files by name is equivalent and safe on every filesystem.
 
 ### 3.3 Five .NET and Blazor details that will cost you time if missed
 
@@ -103,7 +117,7 @@ Verify it at the end of M2 by clicking a tab, before building anything else. Thi
 $"Data Source={dbPath};Foreign Keys=True"
 ```
 
-**3. Resolve the database path from the content root, and create the folder.** SQLite creates the file but not the directory, and `data/` is gitignored so a fresh clone has no folder. In `Program.cs`, before building the app:
+**3. Resolve the database path from the content root, and create the folder.** SQLite creates the file but not the directory, and the database itself is gitignored, so a fresh clone can arrive with no `data/` folder at all. In `Program.cs`, before building the app:
 
 ```csharp
 var dataDir = Path.Combine(builder.Environment.ContentRootPath, "data");

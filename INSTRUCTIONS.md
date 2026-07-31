@@ -257,20 +257,18 @@ rm -rf AssetDesk        # deletes the generated app entirely — SPEC.md rebuild
 
 ---
 
-## 6. Two spec traps to expect on training day
+## 6. Two rehearsal findings worth knowing
 
-Both were hit during the rehearsal. Neither breaks the build, so watch for them rather than fix them
-mid-demo — they make good teaching moments about specs that are subtly wrong.
-
-**1. SPEC.md §3.2 says "Add `data/` to `.gitignore`" — do not follow that literally on a Mac.**
-Because `Data/` (source) and `data/` (database) are the same physical directory on APFS, ignoring
-`data/` also hides `Data/Models.cs`, `Db.cs`, `Format.cs` and `AssetRepository.cs` from git. Verified:
+**1. Why SPEC.md §3.2 ignores the database by name — already fixed, do not "correct" it back.**
+The spec used to say "Add `data/` to `.gitignore`", which is a trap on this machine: `Data/` (source)
+and `data/` (database) are the same physical directory on case-insensitive APFS, so a `data/` rule also
+matches `Data/Models.cs`, `Db.cs`, `Format.cs` and `AssetRepository.cs`. Verified during rehearsal —
 `git check-ignore -v AssetDesk/Data/Models.cs` reports the `data/` rule matching, and `git add -A`
-then stages nothing but the `.gitignore` itself. The whole data layer becomes invisible, and a commit
-at the end of class ships an app with no SQL in it. The rehearsal agent noticed and instead wrote
-`AssetDesk/.gitignore` ignoring `bin/`, `obj/` and `assetdesk.db*` **by name** — the right fix, but it
-was not instructed, so a fresh run may not repeat it. `git show dotnet-demo:AssetDesk/.gitignore` has
-the working version.
+then stages nothing but the `.gitignore` itself. The data layer vanishes from `git status` while the
+build keeps succeeding, so a commit at the end of class ships an app with no SQL in it. §3.2 now orders
+`bin/`, `obj/` and the three `assetdesk.db*` files ignored **by name** instead, with the reason inline.
+If an agent proposes replacing that with `data/`, say no and explain why — it is a good five-second
+lesson in specs that are correct on Linux and wrong on a Mac.
 
 **2. `--empty` does not give an empty project on SDK 10.0.302.** The scaffold command in SPEC.md §3.1
 is accepted, and still emits six files that SPEC.md §2 explicitly bans:
