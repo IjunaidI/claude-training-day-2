@@ -1,0 +1,63 @@
+<div class="backdrop" @onclick="Close"></div>
+<div class="modal">
+    <h2>Assign asset</h2>
+    <p><span class="mono">@Asset.Tag</span> — @Asset.Make @Asset.Model</p>
+
+    @if (_error is not null)
+    {
+        <div class="field-error">@_error</div>
+    }
+
+    <div class="field">
+        <label>Employee</label>
+        <select @bind="_employeeId">
+            <option value="">Select an employee</option>
+            @foreach (var employee in Employees)
+            {
+                <option value="@employee.Id">@employee.Name — @employee.Department</option>
+            }
+        </select>
+    </div>
+
+    <div class="field">
+        <label>Assignment date</label>
+        <input type="date" @bind="_assignedDate" />
+    </div>
+
+    <div class="form-actions">
+        <button type="button" class="btn" @onclick="Close">Cancel</button>
+        <button type="button" class="btn btn-primary" disabled="@(!CanAssign)" @onclick="Confirm">Assign asset</button>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public Asset Asset { get; set; } = null!;
+    [Parameter] public List<Employee> Employees { get; set; } = [];
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public EventCallback OnAssigned { get; set; }
+
+    [Inject] private AssetRepository Repo { get; set; } = default!;
+
+    private string _employeeId = "";
+    private DateOnly? _assignedDate = DateOnly.FromDateTime(DateTime.Today);
+    private string? _error;
+
+    private bool CanAssign => !string.IsNullOrEmpty(_employeeId) && _assignedDate is not null;
+
+    private Task Close() => OnClose.InvokeAsync();
+
+    private async Task Confirm()
+    {
+        if (!CanAssign || _assignedDate is not { } assignedDate) return;
+
+        try
+        {
+            Repo.Assign(Asset.Id, _employeeId, assignedDate.ToString("yyyy-MM-dd"));
+            await OnAssigned.InvokeAsync();
+        }
+        catch (AssetDeskException ex)
+        {
+            _error = ex.Message;
+        }
+    }
+}

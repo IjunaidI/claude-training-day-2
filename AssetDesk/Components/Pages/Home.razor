@@ -1,0 +1,50 @@
+@page "/"
+
+<PageTitle>AssetDesk</PageTitle>
+
+<div class="app-shell">
+    <Sidebar ActiveTab="@_activeTab" OnTabSelected="SetTab" />
+    <div class="content">
+        @if (_activeTab == "Dashboard")
+        {
+            <h1>Dashboard</h1>
+            <Dashboard State="@_state" OnCategorySelected="GoToAssetsWithCategory" />
+        }
+        else if (_activeTab == "Assets")
+        {
+            <h1>Assets</h1>
+            <AssetsTable Rows="@_state.Assets"
+                         Employees="@_state.Employees"
+                         OnStateChanged="Refresh"
+                         PresetCategoryFilter="@_categoryPreset" />
+        }
+        else if (_activeTab == "People")
+        {
+            <h1>People</h1>
+            <People Employees="@_state.Employees" AssetList="@_state.Assets" OnStateChanged="Refresh" />
+        }
+    </div>
+</div>
+
+@code {
+    [Inject] private AssetRepository Repo { get; set; } = default!;
+
+    private string _activeTab = "Dashboard";
+    private AppState _state = new([], []);
+    private Category? _categoryPreset;
+
+    protected override void OnInitialized()
+    {
+        _state = Repo.GetState();
+    }
+
+    private void SetTab(string tab) => _activeTab = tab;
+
+    private void Refresh() => _state = Repo.GetState();
+
+    private void GoToAssetsWithCategory(Category category)
+    {
+        _categoryPreset = category;
+        _activeTab = "Assets";
+    }
+}
