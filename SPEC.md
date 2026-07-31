@@ -47,6 +47,8 @@ dotnet add package Dapper
 dotnet add package Microsoft.Data.Sqlite
 ```
 
+Those four commands are identical on macOS, Windows, and Linux. Run them with whatever shell the host provides.
+
 Target framework is `net10.0`. Do not target `net8.0` or `net9.0`, and do not use pre-.NET-8 Blazor Server patterns (`_Host.cshtml`, `Startup.cs`, `App.razor` as a router). If your SDK rejects `--empty`, create it without that flag and delete every sample page, the `NavMenu` component, and the Bootstrap link in `Components/App.razor` before starting M0.
 
 Exactly two packages. Nothing else may appear in the `.csproj` when you are done.
@@ -94,11 +96,12 @@ assetdesk.db-shm
 assetdesk.db-wal
 ```
 
-Do **not** put `data/` in `.gitignore`. On a case-insensitive filesystem — the macOS default — `Data/`
-(the source folder listed above) and `data/` (the database folder) are the same physical directory, so
-a `data/` rule also matches `Data/Models.cs`, `Db.cs`, `AssetRepository.cs` and `Format.cs`. The whole
-data layer disappears from `git status` and stops being committed, while the build keeps succeeding.
-Ignoring the three sqlite files by name is equivalent and safe on every filesystem.
+Do **not** put `data/` in `.gitignore`. On a case-insensitive filesystem — the default on both macOS
+(APFS) and Windows (NTFS) — `Data/` (the source folder listed above) and `data/` (the database folder)
+are the same physical directory, so a `data/` rule also matches `Data/Models.cs`, `Db.cs`,
+`AssetRepository.cs` and `Format.cs`. The whole data layer disappears from `git status` and stops being
+committed, while the build keeps succeeding. Ignoring the three sqlite files by name is equivalent and
+safe on every filesystem.
 
 ### 3.3 Five .NET and Blazor details that will cost you time if missed
 
@@ -230,6 +233,8 @@ C# is PascalCase. The database is snake_case (`purchase_date`, `assigned_to`). E
 | `Category.*` | same as the C# name | same as the C# name |
 
 Currency is a single constant `const string Currency = "USD"` formatted through `Format.Money(double)` using `CultureInfo.InvariantCulture`. One line to change.
+
+Dates are `CultureInfo.InvariantCulture` too. Every date in this app is an ISO `yyyy-MM-dd` string, and a machine whose locale is not English must still produce `2024-03-11` — so format with an explicit `"yyyy-MM-dd"` and parse with `DateTime.TryParseExact`, never the culture-sensitive default overloads.
 
 ### 4.4 Invariants
 
@@ -547,7 +552,7 @@ Status pills: In stock → `--accent`, Assigned → `--info`, In repair → `--w
 
 `Data/Db.cs` seeds at startup if `SELECT COUNT(*) FROM assets` returns 0. Insert exactly this, in one transaction, employees first. Generate ids with `Guid.NewGuid().ToString()`; the `emp-N` references map to the employee at that index.
 
-To reset during the demo, stop the app, delete `data/assetdesk.db*`, and restart. Say that out loud — students should see the data lives in a file. The wildcard matters: WAL leaves `-wal` and `-shm` files beside the database, and deleting only the base file leaves a confusing half-state.
+To reset, stop the app, delete `assetdesk.db` **together with its `-wal` and `-shm` siblings**, and restart. Deleting only the base file leaves a confusing half-state, because WAL mode keeps live pages in the sidecar files. The exact command differs per shell — see `INSTRUCTIONS-MACOS.md` or `INSTRUCTIONS-WINDOWS.md` §5.
 
 **Employees**
 
@@ -604,7 +609,7 @@ If a milestone overruns, cut scope inside that milestone rather than skipping th
 - [ ] `dotnet build` succeeds with zero warnings, including nullable warnings
 - [ ] `dotnet run` starts with no exceptions and no errors in the browser console
 - [ ] Clicking a sidebar tab changes the view — interactivity is confirmed, not assumed
-- [ ] Deleting `data/assetdesk.db*` and restarting reproduces the exact seed state
+- [ ] Deleting the database and its `-wal`/`-shm` siblings and restarting reproduces the exact seed state
 - [ ] Every acceptance-criteria checkbox in section 5 passes when clicked through by hand
 - [ ] Refreshing the browser preserves all changes, because they are in the database
 - [ ] Every invariant in 4.4 holds, including when the request comes from `curl` and bypasses the UI
@@ -624,3 +629,4 @@ If a milestone overruns, cut scope inside that milestone rather than skipping th
 6. If something is genuinely ambiguous, pick the simplest reading, state the assumption in one line, and keep going. Do not stop to ask.
 7. If you want to add something not in this spec, don't. Note it under a "Possible next steps" heading at the end instead.
 8. Report progress as a one-line note per completed milestone. No essays.
+9. Nothing in this document is macOS- or Windows-specific, and nothing you write may be. Build every path with `Path.Combine` and never a literal `/` or `\`. Read the host platform from your own environment and use the shell it actually has — the person you are building for should not have to translate a command for you, and will not be told which OS you are on.
