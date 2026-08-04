@@ -111,9 +111,12 @@ convention every skill in the local plugin cache uses.
 
 ### `blazor-component-hygiene` — checkpoint 4
 
-- A `.razor` file over ~150 lines splits. No business logic in markup.
+- One component, one job. The components `SPEC.md` §3.2 names stay separate; collapsing two into one
+  file is a violation even if the result is short. Numeric tripwire at 250 lines — `AssetsTable.razor`
+  is legitimately ~246, so a 150-line cap would have made the *clean* app violate its own rule.
+- No business logic in markup.
 - DTOs declared once and shared, never re-declared inline per component.
-- Status and tab values come from the enum, never magic strings.
+- `Status`, `Category`, and `Condition` come from the enum, never string literals.
 
 ## The review kit — every branch
 
@@ -180,7 +183,7 @@ unambiguous.
 | Q2 | `!` on a deserialize result, plus `<NoWarn>` hiding a genuine warning | `csharp-quality` |
 | Q3 | `POST /api/assets` trusts its body; tag/cost/quantity validated UI-side only | `csharp-quality` (and SPEC.md §4.6 guard method) |
 | Q4 | An oversized component doing fetch + state + render, with DTOs re-declared inline | `blazor-component-hygiene` |
-| Q5 | Magic strings for status and tab instead of the enum | `blazor-component-hygiene` |
+| Q5 | `Status` compared as a string literal instead of the `Status` enum | `blazor-component-hygiene` |
 
 Q1 is deliberately **visible**: students click through it and watch the banner come up empty rather
 than only reading about it in a report.
