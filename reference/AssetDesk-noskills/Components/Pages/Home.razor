@@ -1,0 +1,283 @@
+@page "/"
+
+<PageTitle>AssetDesk</PageTitle>
+
+<div class="app-shell">
+    <Sidebar ActiveTab="@_activeTab" OnTabSelected="SetTab" />
+    <div class="content">
+        @if (_activeTab == "Dashboard")
+        {
+            <h1>Dashboard</h1>
+            <Dashboard State="@_state" OnCategorySelected="GoToAssetsWithCategory" />
+        }
+        else if (_activeTab == "Assets")
+        {
+            <h1>Assets</h1>
+
+            @if (_errorMessage is not null)
+            {
+                <div class="banner">
+                    <span>@_errorMessage</span>
+                    <button type="button" @onclick="() => _errorMessage = null">Dismiss</button>
+                </div>
+            }
+
+            <div class="toolbar">
+                <input type="search"
+                       placeholder="Search tag, make, model, or serial"
+                       @bind="_search"
+                       @bind:event="oninput" />
+
+                <select @bind="_categoryFilter">
+                    <option value="">All categories</option>
+                    @foreach (var category in Categories)
+                    {
+                        <option value="@category">@Format.Label(category)</option>
+                    }
+                </select>
+
+                <select @bind="_statusFilter">
+                    <option value="">All statuses</option>
+                    @foreach (var status in Statuses)
+                    {
+                        <option value="@status">@Format.Label(status)</option>
+                    }
+                </select>
+
+                <div class="spacer"></div>
+
+                <button type="button" class="btn btn-primary" @onclick="() => _drawerOpen = true">Add asset</button>
+            </div>
+
+            <div class="result-count">Showing @FilteredAndSorted.Count of @_state.Assets.Count assets</div>
+
+            @if (FilteredAndSorted.Count == 0)
+            {
+                <div class="empty-state">
+                    <p>No assets match these filters.</p>
+                    <button type="button" class="btn" @onclick="ClearFilters">Clear filters</button>
+                </div>
+            }
+            else
+            {
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th class="sortable" @onclick='() => ToggleSort("Tag")'>Tag</th>
+                            <th class="sortable" @onclick='() => ToggleSort("Category")'>Category</th>
+                            <th>Device</th>
+                            <th class="sortable" @onclick='() => ToggleSort("Status")'>Status</th>
+                            <th>Assigned to</th>
+                            <th>Since</th>
+                            <th>Location</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var asset in FilteredAndSorted)
+                        {
+                            <tr class="@(asset.Status == Status.Retired ? "retired" : "")">
+                                <td class="mono">@asset.Tag</td>
+                                <td>@Format.Label(asset.Category)</td>
+                                <td>
+                                    @asset.Make @asset.Model
+                                    <br />
+                                    <span class="mono muted">@asset.Serial</span>
+                                </td>
+                                <td><StatusPill Status="asset.Status" /></td>
+                                <td>@(asset.AssignedTo is null ? "—" : AssigneeName(asset))</td>
+                                <td class="mono">@(asset.AssignedDate ?? "—")</td>
+                                <td>@asset.Location</td>
+                                <td>
+                                    <div class="actions">
+                                        @switch (asset.Status)
+                                        {
+                                            case Status.InStock:
+                                                <button type="button" class="btn btn-sm" @onclick="() => _assignTarget = asset">Assign</button>
+                                                <button type="button" class="btn btn-sm" @onclick="() => HandleSetStatus(asset, Status.Repair)">Mark repair</button>
+                                                <button type="button" class="btn btn-sm" @onclick="() => HandleSetStatus(asset, Status.Retired)">Retire</button>
+                                                break;
+                                            case Status.Assigned:
+                                                <button type="button" class="btn btn-sm" @onclick="() => HandleReturn(asset)">Return</button>
+                                                <button type="button" class="btn btn-sm" @onclick="() => HandleSetStatus(asset, Status.Retired)">Retire</button>
+                                                break;
+                                            case Status.Repair:
+                                                <button type="button" class="btn btn-sm" @onclick="() => HandleSetStatus(asset, Status.InStock)">Mark in stock</button>
+                                                <button type="button" class="btn btn-sm" @onclick="() => HandleSetStatus(asset, Status.Retired)">Retire</button>
+                                                break;
+                                        }
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+
+            @if (_drawerOpen)
+            {
+                <AddAssetDrawer ExistingAssets="@_state.Assets"
+                                 OnClose="() => _drawerOpen = false"
+                                 OnCreated="HandleCreated" />
+            }
+
+            @if (_assignTarget is not null)
+            {
+                <AssignDialog Asset="@_assignTarget"
+                              Employees="@_state.Employees"
+                              OnClose="() => _assignTarget = null"
+                              OnAssigned="HandleAssigned" />
+            }
+        }
+        else if (_activeTab == "People")
+        {
+            <h1>People</h1>
+            <People Employees="@_state.Employees" AssetList="@_state.Assets" OnStateChanged="Refresh" />
+        }
+    </div>
+</div>
+
+@code {
+    // Q4: a second source of truth for a shape that already exists in Data/Models.cs.
+    private record Row(string Tag, string Category, string Status, string AssignedTo, double Cost);
+
+    private static readonly Category[] Categories = Enum.GetValues<Category>();
+    private static readonly Status[] Statuses = Enum.GetValues<Status>();
+
+    [Inject] private AssetRepository Repo { get; set; } = default!;
+
+    private string _activeTab = "Dashboard";
+    private AppState _state = new([], []);
+
+    private string? _errorMessage;
+    private bool _drawerOpen;
+    private Asset? _assignTarget;
+
+    private string _search = "";
+    private string _categoryFilter = "";
+    private string _statusFilter = "";
+    private string _sortColumn = "Tag";
+    private bool _sortAscending = true;
+
+    protected override void OnInitialized()
+    {
+        _state = Repo.GetState();
+    }
+
+    private void SetTab(string tab) => _activeTab = tab;
+
+    private void Refresh() => _state = Repo.GetState();
+
+    private void GoToAssetsWithCategory(Category category)
+    {
+        _categoryFilter = category.ToString();
+        _activeTab = "Assets";
+    }
+
+    // Q5: magic strings where Status exists as an enum in Data/Models.cs.
+    private int InStockCount => _state.Assets.Count(a => a.Status.ToString() == "InStock");
+    private bool IsRepair(Asset a) => a.Status.ToString() == "Repair";
+
+    private List<Asset> FilteredAndSorted
+    {
+        get
+        {
+            IEnumerable<Asset> query = _state.Assets;
+
+            if (!string.IsNullOrWhiteSpace(_search))
+            {
+                query = query.Where(a =>
+                    a.Tag.Contains(_search, StringComparison.OrdinalIgnoreCase) ||
+                    a.Make.Contains(_search, StringComparison.OrdinalIgnoreCase) ||
+                    a.Model.Contains(_search, StringComparison.OrdinalIgnoreCase) ||
+                    a.Serial.Contains(_search, StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (_categoryFilter != "")
+            {
+                var category = Enum.Parse<Category>(_categoryFilter);
+                query = query.Where(a => a.Category == category);
+            }
+
+            if (_statusFilter != "")
+            {
+                var status = Enum.Parse<Status>(_statusFilter);
+                query = query.Where(a => a.Status == status);
+            }
+
+            query = _sortColumn switch
+            {
+                "Category" => _sortAscending ? query.OrderBy(a => a.Category) : query.OrderByDescending(a => a.Category),
+                "Status" => _sortAscending ? query.OrderBy(a => a.Status) : query.OrderByDescending(a => a.Status),
+                _ => _sortAscending ? query.OrderBy(a => a.Tag) : query.OrderByDescending(a => a.Tag),
+            };
+
+            return query.ToList();
+        }
+    }
+
+    private void ToggleSort(string column)
+    {
+        if (_sortColumn == column)
+        {
+            _sortAscending = !_sortAscending;
+        }
+        else
+        {
+            _sortColumn = column;
+            _sortAscending = true;
+        }
+    }
+
+    private void ClearFilters()
+    {
+        _search = "";
+        _categoryFilter = "";
+        _statusFilter = "";
+    }
+
+    private string EmployeeName(string? employeeId) =>
+        _state.Employees.FirstOrDefault(e => e.Id == employeeId)?.Name ?? "—";
+
+    // Q2: an unguarded dereference whose CS8602 is hidden by the NoWarn above.
+    private string AssigneeName(Asset a) =>
+        _state.Employees.FirstOrDefault(e => e.Id == a.AssignedTo).Name;
+
+    private void HandleCreated()
+    {
+        _drawerOpen = false;
+        Refresh();
+    }
+
+    private void HandleAssigned()
+    {
+        _assignTarget = null;
+        Refresh();
+    }
+
+    private void HandleReturn(Asset asset)
+    {
+        try
+        {
+            Repo.Return(asset.Id);
+            Refresh();
+        }
+        catch (AssetDeskException ex)
+        {
+            _errorMessage = ex.Message;
+        }
+    }
+
+    private void HandleSetStatus(Asset asset, Status status)
+    {
+        try
+        {
+            Repo.SetStatus(asset.Id, status);
+            Refresh();
+        }
+        catch (AssetDeskException ex)
+        {
+            _errorMessage = ex.Message;
+        }
+    }
+}
