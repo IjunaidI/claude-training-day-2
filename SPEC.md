@@ -67,7 +67,7 @@ AssetDesk/
       MainLayout.razor
       Sidebar.razor
     Pages/
-      Home.razor                  # the only page — owns all state
+      Home.razor                  # the only page
     Shared/
       Dashboard.razor
       AssetsTable.razor
@@ -143,19 +143,13 @@ Plain `@bind` only updates on blur and the search will feel broken.
 | Decision | Choice |
 |---|---|
 | UI | Blazor Web App, `InteractiveServer` render mode, global |
-| Data access | `AssetRepository` only. Registered as a singleton. No component contains SQL |
+| Data access | `AssetRepository`, registered as a singleton |
 | SQL | Dapper over `Microsoft.Data.Sqlite`. Synchronous — see below |
 | Connections | One `using var conn = new SqliteConnection(_connectionString)` per repository method. Dapper opens it |
 | Transactions | `conn.BeginTransaction()` for every mutation, passed to each `Execute` |
 | Schema init | Runs once in `Program.cs` before `app.Run()` |
-| Page state | `Home.razor` holds `AppState` and the active tab in private fields, passes them down as parameters |
-| Refresh | After any mutation, `Home.razor` re-reads `repo.GetState()` and reassigns the field |
 
 **Synchronous data access is deliberate.** Dapper's async methods would be correct for a networked database, but SQLite here is a local file, the queries are sub-millisecond, and synchronous calls in Blazor event handlers avoid every `StateHasChanged` and `await` ordering trap. State the trade-off out loud; do not silently switch to async.
-
-**Components call the repository directly.** There is no HTTP between the UI and the data. This is the main advantage of Blazor Server for this app and it deletes the fetch layer, the JSON serialisation, and the error-code translation that a SPA would need.
-
-**The six API endpoints exist anyway.** `Program.cs` maps them, and the UI never calls them. They exist so that M0 and M1 are verifiable with `curl` before a single component is written, and so that section 9 can prove the invariants hold against requests that bypass the UI entirely. Both paths go through `AssetRepository`, so there is no duplicated logic.
 
 Icons, where needed, are inline SVG or a single Unicode character. Keep it boring.
 
@@ -329,7 +323,7 @@ Validate `NewAssetInput` with a hand-written guard method in the repository. No 
 
 ### 4.7 API endpoints
 
-Mapped in `Program.cs`. The UI does not use them. They exist for command-line verification during M0 and M1 and for the invariant tests in section 9.
+Mapped in `Program.cs`. They must work from the command line — M0 and M1 are verified with `curl` before any component exists, and section 9's invariant checks go through them.
 
 | Method | Path | Body | Returns |
 |---|---|---|---|
@@ -615,7 +609,6 @@ If a milestone overruns, cut scope inside that milestone rather than skipping th
 - [ ] Every invariant in 4.4 holds, including when the request comes from `curl` and bypasses the UI
 - [ ] Invariant 5 specifically: a `curl` assign with a fabricated employee id is rejected, proving `Foreign Keys=True` took effect
 - [ ] Every repository error surfaces in the UI as the exception message verbatim
-- [ ] No `!` null-forgiving operator and no suppressed warnings anywhere
 - [ ] The `.csproj` gained exactly `Dapper` and `Microsoft.Data.Sqlite`
 - [ ] Nothing from section 2 has been built
 
