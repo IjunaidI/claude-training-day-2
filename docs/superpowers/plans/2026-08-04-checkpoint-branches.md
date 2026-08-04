@@ -920,7 +920,7 @@ The empty string rather than `null` is the point: line 6 of the same file guards
 can *see* — assign an asset that is in repair and the banner comes up blank. It also violates
 `SPEC.md` §4.6, so it belongs in the SPEC bucket as well as QUALITY.
 
-- [ ] **Step 5: Plant Q2 — a suppression and a null-forgiving operator**
+- [ ] **Step 5: Plant Q2 — a real warning and the suppression hiding it**
 
 In `reference/AssetDesk-noskills/AssetDesk.csproj`, inside the first `<PropertyGroup>`, add:
 
@@ -929,19 +929,28 @@ In `reference/AssetDesk-noskills/AssetDesk.csproj`, inside the first `<PropertyG
 ```
 
 Then in `Components/Shared/AssetsTable.razor`, introduce the dereference that warning was hiding —
-inside the row-rendering loop, resolve the assignee name without a null check:
+inside the `@code` block, resolve the assignee name without a null check:
 
 ```csharp
-// Q2: null-forgiving operator plus a NoWarn that hides the resulting CS8602.
+// Q2: an unguarded dereference whose CS8602 is hidden by the NoWarn above.
 private string AssigneeName(Asset a) =>
-    Employees.FirstOrDefault(e => e.Id == a.AssignedTo)!.Name;
+    Employees.FirstOrDefault(e => e.Id == a.AssignedTo).Name;
 ```
 
-Call it from the `Assigned to` cell. An in-stock asset has `AssignedTo == null`, so this is a real
-`NullReferenceException` waiting behind a suppressed warning.
+`FirstOrDefault` returns `Employee?`, so `.Name` raises `CS8602: Dereference of a possibly null
+reference`, and the `<NoWarn>` is what keeps the build at zero warnings. **Do not write `!` here.** The
+null-forgiving operator suppresses CS8602 by itself, which would leave the `<NoWarn>` dead and the
+"suppressed warning" nonexistent — the two halves of this issue have to be a real warning and a real
+suppression, or the reviewer has nothing to find.
 
-Guard the call site so the app still runs — `@(a.AssignedTo is null ? "—" : AssigneeName(a))` — the
-defect stays real for anyone who calls `AssigneeName` directly, which is the point.
+Call it from the `Assigned to` cell, guarded so the app still runs:
+`@(a.AssignedTo is null ? "—" : AssigneeName(a))`. The defect stays real for any caller that skips the
+guard, which is the point.
+
+Confirm the warning is genuinely being suppressed rather than absent — temporarily remove the
+`<NoWarn>` line, run `dotnet build reference/AssetDesk-noskills`, and check that `CS8602` appears. Put
+the line back and confirm the build returns to `0 Warning(s)`. If CS8602 never appears, the dereference
+is not actually unguarded and Q2 is not planted.
 
 - [ ] **Step 6: Plant Q3 — remove the server-side guard**
 
@@ -1250,8 +1259,8 @@ Apply Q1 through Q5 exactly as written in Task 6, Steps 4–8, adapted to the as
 
 - **Q1** in `AssignDialog.razor`: `catch (AssetDeskException) { _error = ""; }`
 - **Q2** in `AssetDesk.csproj`: `<NoWarn>$(NoWarn);CS8602</NoWarn>`, plus
-  `Employees.FirstOrDefault(e => e.Id == a.AssignedTo)!.Name` in the assignee cell (typed on
-  `AssetDto`/`EmployeeDto` here)
+  `Employees.FirstOrDefault(e => e.Id == a.AssignedTo).Name` in the assignee cell — no `!`, for the
+  reason given in Task 6 Step 5 — typed on `AssetDto`/`EmployeeDto` here
 - **Q3** in `Data/AssetRepository.cs`: `// ValidateNewAsset(input);`
 - **Q4**: inline the table into `Home.razor`, delete `AssetsTable.razor`, re-declare
   `private record Row(string Tag, string Category, string Status, string AssignedTo, double Cost);`
@@ -1386,7 +1395,12 @@ No `!` null-forgiving operator. No `#pragma warning disable`. No `<NoWarn>` in t
 warning is information; suppressing it deletes the information and keeps the bug.
 
 ```csharp
-// NEVER — CS8602 suppressed, NullReferenceException preserved
+// NEVER — the .csproj carries <NoWarn>CS8602</NoWarn>, so this compiles clean
+// and keeps the NullReferenceException
+private string AssigneeName(AssetDto a) =>
+    Employees.FirstOrDefault(e => e.Id == a.AssignedTo).Name;
+
+// ALSO NEVER — same bug, suppressed inline instead of in the .csproj
 private string AssigneeName(AssetDto a) =>
     Employees.FirstOrDefault(e => e.Id == a.AssignedTo)!.Name;
 
@@ -1578,17 +1592,21 @@ catch (AssetDeskException ex)
 }
 ```
 
-- [ ] **Step 4: Fix Q2 — remove the suppression and the null-forgiving operator**
+- [ ] **Step 4: Fix Q2 — remove the suppression and the bug it was hiding**
 
-Delete the `<NoWarn>$(NoWarn);CS8602</NoWarn>` line from `AssetDesk.csproj`, then fix the dereference
-it was hiding:
+Delete the `<NoWarn>$(NoWarn);CS8602</NoWarn>` line from `AssetDesk.csproj`. Build once with the
+dereference still unguarded and confirm `CS8602` now appears — that proves the suppression was load
+bearing and you are fixing a real warning, not deleting a no-op line. Then fix it:
 
 ```csharp
 private string AssigneeName(AssetDto a) =>
     Employees.FirstOrDefault(e => e.Id == a.AssignedTo)?.Name ?? "—";
 ```
 
-The build must stay at 0 warnings *without* the suppression. That is the proof.
+The build must return to 0 warnings *without* any suppression. That is the proof.
+
+Also drop the now-unnecessary guard at the call site — `@AssigneeName(a)` is enough, since the method
+handles null itself.
 
 - [ ] **Step 5: Fix Q3 — restore the server-side guard**
 
