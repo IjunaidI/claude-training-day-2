@@ -58,7 +58,7 @@ design docs would be noise at best and spoilers at worst.
 
 ## Spec thinning
 
-Eight surgical edits to `SPEC.md`. Nothing in the data model, screens, visual design, or seed data is
+Nine surgical edits to `SPEC.md` (eight planned, one found by review). Nothing in the data model, screens, visual design, or seed data is
 touched — those are what hold the four builds comparable. Line numbers are against the current
 `main` (`SPEC.md` as of e52c313).
 
@@ -66,11 +66,12 @@ touched — those are what hold the four builds comparable. Line numbers are aga
 |---|---|---|---|
 | 70 | `Home.razor    # the only page — owns all state` | Trim comment to `# the only page` | Consistency with removing the Page state row below |
 | 146 | `Data access \| AssetRepository only. Registered as a singleton. No component contains SQL` | Trim to `Data access \| AssetRepository, registered as a singleton` | Drops the ruling on who may call the repository; keeps the repository itself, so the app stays structurally comparable |
-| 151 | `Page state \| Home.razor holds AppState and the active tab in private fields…` | Remove row | State ownership is a skill concern |
+| 151 | `Page state \| Home.razor holds AppState and the active tab in private fields…` | Remove row | Names `AppState` as the UI's own type, which `api-boundary` replaces with `AppStateDto`. **Tab-state ownership is not the reason** — see the note below |
 | 152 | `Refresh \| After any mutation, Home.razor re-reads repo.GetState()…` | Remove row | Names the repository as the UI's data source |
 | 156 | `**Components call the repository directly.** There is no HTTP between the UI and the data.…` | Remove paragraph | States the exact opposite of the `api-boundary` skill |
 | 158 | `**The six API endpoints exist anyway.** … and the UI never calls them.…` | Remove paragraph | Same conflict |
 | 332 | `Mapped in Program.cs. The UI does not use them.…` | Replace with: `Mapped in Program.cs. They must work from the command line — M0 and M1 are verified with curl before any component exists, and section 9's invariant checks go through them.` | Keeps the endpoints mandatory and curl-verifiable without ruling on whether the UI uses them |
+| 208 | `…are the only nullable reference types in the model — keep nullable reference types enabled and do not silence a warning with \`!\`` | Drop the `!` clause; keep `keep nullable reference types enabled` | Prose duplicate of the §9 item below. Found by review, not in the original edit list — §9 alone was not enough, and §9 still requires a zero-warning build including nullable warnings, so that half must survive |
 | 618 | Checklist item: no `!` null-forgiving operator and no suppressed warnings anywhere | Remove checklist item | Owned by `csharp-quality`; leaving it means checkpoint 1 already passes and the skill demonstrates nothing |
 
 **Deliberately kept:**
@@ -84,6 +85,16 @@ touched — those are what hold the four builds comparable. Line numbers are aga
   swallowed-exception issue a **spec** violation as well as a skill violation — the review should
   catch spec bugs, not only skill bugs.
 - Section 2 (non-goals) in full. It is what keeps scope comparable across the four builds.
+- **Line 341, `Tab state is a private field on Home.razor.`** No skill in this project governs tab
+  state, so nothing contradicts it, and §8's M2 milestone (`Home.razor with tab state`) states it a
+  third time — silencing the spec on tab state would take three edits and buy no demo value. Tab-state
+  ownership therefore stays specified, and the §3.4 row above was removed for its `AppState` half
+  alone.
+
+**Eight is now nine.** Line 208 was found by the Task 1 review, not by the original scan. The lesson
+generalises: a rule stated in a table row is often restated in prose elsewhere, and grepping for the
+*rule* rather than the *line* is what catches it. Both remaining checks — `silence a warning` and
+`Tab state is a private field` — are in the plan's verification step.
 
 ## The skills
 
