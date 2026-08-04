@@ -205,7 +205,7 @@ public record NewAssetInput(
 public class AssetDeskException(string message) : Exception(message);
 ```
 
-The enums are load-bearing. A typo in a status is a compile error, and the same rule is repeated as a `CHECK` in 4.4 so values arriving from outside C# are rejected too. `AssignedTo` and `AssignedDate` are the only nullable reference types in the model — keep nullable reference types enabled and do not silence a warning with `!`.
+The enums are load-bearing. A typo in a status is a compile error, and the same rule is repeated as a `CHECK` in 4.4 so values arriving from outside C# are rejected too. `AssignedTo` and `AssignedDate` are the only nullable reference types in the model — keep nullable reference types enabled.
 
 `AssetDeskException` carries a message that is safe to show a user directly. Every message in the table in 4.6 is thrown as one of these, and the UI displays `ex.Message` verbatim.
 
