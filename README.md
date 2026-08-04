@@ -7,7 +7,7 @@ otherwise empty repository, and finish with a running .NET 10 Blazor app that no
 
 | File | What it is |
 |---|---|
-| [SPEC.md](SPEC.md) | The only source of truth. describing **AssetDesk**, an IT asset-management tool: data model, invariants, screens, visual design, build order, definition of done. |
+| [SPEC.md](SPEC.md) | The only source of truth. Describes **AssetDesk**, an IT asset-management tool: data model, invariants, screens, visual design, build order, definition of done. |
 | [CHECKPOINTS.md](CHECKPOINTS.md) | The four checkpoints, the one prompt they all share, and how to switch between them. **Read this first.** |
 | [INSTRUCTIONS-MACOS.md](INSTRUCTIONS-MACOS.md) | Install, build, run, verify, reset — macOS. |
 | [INSTRUCTIONS-WINDOWS.md](INSTRUCTIONS-WINDOWS.md) | The same, in PowerShell. |

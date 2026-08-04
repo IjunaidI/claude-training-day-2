@@ -24,7 +24,8 @@ Two more you will want:
 
 ```bash
 find AssetDesk -name 'assetdesk.db*' -delete                  # reset the demo data
-rm -rf AssetDesk && git checkout dotnet-demo                  # bail out to the finished app
+git add -A && git commit -m wip                               # save your build first
+git checkout checkpoint-3                                     # a finished app to fall back on
 ```
 
 Fresh machine? Do §1 first. Everything after §3 is optional reading.
@@ -257,7 +258,7 @@ count.
 
 ```bash
 rm -rf AssetDesk       # REQUIRED FIRST
-git checkout dotnet-demo
+git checkout checkpoint-3
 dotnet run --project AssetDesk --urls http://localhost:5198
 ```
 
@@ -273,7 +274,7 @@ Aborting
 ```
 
 Neither `git switch` nor `git stash` helps — the files are untracked, not modified. Delete then check
-out. (`git checkout -f dotnet-demo` also works but leaves stray scaffold files behind.)
+out. (`git checkout -f checkpoint-3` also works but leaves stray scaffold files behind.)
 
 ---
 
@@ -311,7 +312,7 @@ find AssetDesk -name '*.razor.css' -o -name '*.razor.js'      # must print nothi
 
 | Symptom | Fix |
 |---|---|
-| `git checkout dotnet-demo` → `untracked working tree files would be overwritten` | Your build already scaffolded `AssetDesk/`. `rm -rf AssetDesk`, then check out (§6). `git stash`/`git switch` will not help — untracked, not modified. |
+| `git checkout checkpoint-3` → `untracked working tree files would be overwritten` | Your build already scaffolded `AssetDesk/`. `rm -rf AssetDesk`, then check out (§6). `git stash`/`git switch` will not help — untracked, not modified. |
 | `Failed to bind to address http://127.0.0.1:5198: address already in use` | An older run is still listening. `lsof -nP -iTCP:5198 -sTCP:LISTEN` then `kill <PID>`, or move: `--urls http://localhost:5299`. Stale `dotnet watch` processes outlive a closed tab. |
 | `/api/health` answers but `/api/state` 500s with `SQLite Error 14: 'unable to open database file'` | You are talking to a **stale process from a directory that no longer exists**, not your app. `lsof` for the PID, confirm with `ps aux \| grep AssetDesk`, kill it. |
 | `/api/state` shows 13 assets, not 12 | An old database survived. `find AssetDesk -name 'assetdesk.db*' -delete` and restart. |
@@ -339,7 +340,8 @@ All from the repo root.
 ```bash
 # branches
 git checkout main && rm -rf AssetDesk                    # clean starting point
-rm -rf AssetDesk && git checkout dotnet-demo             # fall back to the finished app
+git add -A && git commit -m wip                          # save your build first
+git checkout checkpoint-3                                # a finished app to fall back on
 
 # build & run
 dotnet build AssetDesk

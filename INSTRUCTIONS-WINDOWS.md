@@ -27,7 +27,8 @@ Two more you will want:
 
 ```powershell
 Get-ChildItem AssetDesk -Recurse -Filter 'assetdesk.db*' | Remove-Item -Force   # reset the demo data
-Remove-Item AssetDesk -Recurse -Force; git checkout dotnet-demo                 # bail out to the finished app
+git add -A; git commit -m wip                                                   # save your build first
+git checkout checkpoint-3                                                       # a finished app to fall back on
 ```
 
 Clone somewhere short and local — `C:\src`, not Desktop, Documents, or anything OneDrive syncs. See
@@ -282,7 +283,7 @@ wrong count.
 
 ```powershell
 Remove-Item AssetDesk -Recurse -Force      # REQUIRED FIRST
-git checkout dotnet-demo
+git checkout checkpoint-3
 dotnet run --project AssetDesk --urls http://localhost:5198
 ```
 
@@ -350,7 +351,7 @@ Get-ChildItem AssetDesk -Recurse -Include '*.razor.css', '*.razor.js'    # must 
 
 | Symptom | Fix |
 |---|---|
-| `git checkout dotnet-demo` → `untracked working tree files would be overwritten` | Your build already scaffolded `AssetDesk\`. `Remove-Item AssetDesk -Recurse -Force`, then check out (§6). `git stash`/`git switch` will not help — untracked, not modified. |
+| `git checkout checkpoint-3` → `untracked working tree files would be overwritten` | Your build already scaffolded `AssetDesk\`. `Remove-Item AssetDesk -Recurse -Force`, then check out (§6). `git stash`/`git switch` will not help — untracked, not modified. |
 | `Failed to bind to address http://127.0.0.1:5198: address already in use` | An older run is still listening: `Get-NetTCPConnection -LocalPort 5198 -State Listen -ErrorAction SilentlyContinue`, then `Stop-Process -Id <OwningProcess> -Force`. Or move: `--urls http://localhost:5299`. Stale `dotnet watch` processes outlive a closed tab — `Get-Process dotnet` lists them. |
 | `/api/health` answers but `/api/state` 500s with `SQLite Error 14: 'unable to open database file'` | You are talking to a **stale process from a directory that no longer exists**, not your app. Find it with `Get-Process dotnet \| Select-Object Id, Path`, and kill it. |
 | `/api/state` shows 13 assets, not 12 | An old database survived. `Get-ChildItem AssetDesk -Recurse -Filter 'assetdesk.db*' \| Remove-Item -Force` and restart. |
@@ -382,7 +383,8 @@ All from the repo root.
 ```powershell
 # branches
 git checkout main; Remove-Item AssetDesk -Recurse -Force -ErrorAction SilentlyContinue
-Remove-Item AssetDesk -Recurse -Force; git checkout dotnet-demo
+git add -A; git commit -m wip
+git checkout checkpoint-3
 
 # build & run
 dotnet build AssetDesk
