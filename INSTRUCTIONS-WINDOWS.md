@@ -250,13 +250,18 @@ git checkout main; Remove-Item AssetDesk -Recurse -Force -ErrorAction SilentlyCo
 
 | Branch | What it is | When |
 |---|---|---|
-| `main` | Spec only: `SPEC.md`, `README.md`, the two instructions files, `.gitignore` | **Start here.** Build live from the spec. |
-| `dotnet-demo` | `main` plus the finished app in `AssetDesk\` | Your build broke or ran long. Check it out and keep up. |
-| `nodejs-demo` | Archive of the pre-.NET attempt — a bare `create-next-app` scaffold and the old v2.0 Next.js spec | Historical curiosity. **Not a working app.** |
+| `main`, `checkpoint-1` | Checkpoint 1. Spec, runbook, instructions, and the reviewer | **Start here.** |
+| `checkpoint-2` | + the `api-boundary` skill | Checkpoint 2 |
+| `checkpoint-3` | + two finished apps to review. No build | Checkpoint 3 |
+| `checkpoint-4` | + the two quality skills | Checkpoint 4 |
+| `checkpoint-4-result` | Checkpoint 4's finished app | Only after your own checkpoint-4 build is done or abandoned |
+| `dotnet-demo` | The original single-exercise build, against the unthinned spec | Historical reference |
+| `nodejs-demo` | Archive of the pre-.NET attempt | Historical curiosity. **Not a working app.** |
 
-`nodejs-demo` holds the stock `create-next-app` welcome page and zero asset-management code — no
-components, no data layer, no API — and would need a `pnpm install` before it even started.
-`dotnet-demo` is the only real fallback.
+The switching ritual — commit, switch, delete the database, restart Claude Code — is in
+[CHECKPOINTS.md](CHECKPOINTS.md#switching-checkpoints). Follow it rather than the older
+`Remove-Item -Recurse -Force AssetDesk` advice: committing your build first makes the delete
+unnecessary and keeps your work.
 
 ### Starting clean
 
@@ -364,6 +369,9 @@ Get-ChildItem AssetDesk -Recurse -Include '*.razor.css', '*.razor.js'    # must 
 | A new slash command or skill is missing from `/` | Restart the session: `/exit`, then `claude`. `/clear` is **not** enough — commands and skills register at startup only. |
 | `CLAUDE.md` looks ignored | `/context`. If it is not listed, `claude` was launched outside the repo or the filename is wrong (`CLAUDE.md`, exactly). |
 | Anything else odd in Claude Code | `/doctor` — it diagnoses install and config and can apply fixes itself. |
+| `/review-build` is missing from the `/` list after switching checkpoints | Skills register at startup only. `/exit`, then `claude`. `/clear` will not do it. |
+| `git switch checkpoint-N` refuses over your build | You did not commit it. `git add -A; git commit -m wip`, then switch. Your build stays on the branch you left. |
+| `MSBUILD : error MSB1011: more than one project` | `checkpoint-3` holds two apps. Name the one you mean: `dotnet build AssetDesk` or `dotnet build reference\AssetDesk-noskills`. |
 
 ---
 

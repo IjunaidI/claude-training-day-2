@@ -7,7 +7,8 @@ otherwise empty repository, and finish with a running .NET 10 Blazor app that no
 
 | File | What it is |
 |---|---|
-| [SPEC.md](SPEC.md) | The only source of truth. ~600 lines describing **AssetDesk**, an IT asset-management tool: data model, invariants, screens, visual design, build order, definition of done. |
+| [SPEC.md](SPEC.md) | The only source of truth. describing **AssetDesk**, an IT asset-management tool: data model, invariants, screens, visual design, build order, definition of done. |
+| [CHECKPOINTS.md](CHECKPOINTS.md) | The four checkpoints, the one prompt they all share, and how to switch between them. **Read this first.** |
 | [INSTRUCTIONS-MACOS.md](INSTRUCTIONS-MACOS.md) | Install, build, run, verify, reset — macOS. |
 | [INSTRUCTIONS-WINDOWS.md](INSTRUCTIONS-WINDOWS.md) | The same, in PowerShell. |
 
@@ -24,14 +25,20 @@ include it.
 
 ## How the session runs
 
-1. `claude`, then `/model sonnet`, then one prompt: **Read SPEC.md and build it.**
-2. It works through eight milestones (§8 of the spec), data layer first, UI last. Read the diffs as
-   they land — that is the actual exercise.
-3. Run it, click through the acceptance criteria in §5, then go looking for where the spec let it
-   improvise.
+The session runs as four checkpoints. Same spec, same one-line prompt, a different set of skills
+loaded each time — so any difference in the result is the skills' doing and nothing else.
 
-The app is not the point. The point is what a specification has to pin down before an agent can
-execute it without you in the loop, and which of your own specs would have survived that.
+| # | Branch | Adds | You see |
+|---|---|---|---|
+| 1 | `main` | nothing but the reviewer | What a detailed spec still leaves undecided |
+| 2 | `checkpoint-2` | `api-boundary` | One skill settling the architecture |
+| 3 | `checkpoint-3` | two finished apps | The two reviews side by side, no build needed |
+| 4 | `checkpoint-4` | two quality skills | A review with almost nothing left to say |
+
+[CHECKPOINTS.md](CHECKPOINTS.md) is the runbook. Work through it in order.
+
+The app is not the point. The point is which of your own specs would have survived being executed
+literally, and how much of the gap a few pages of skills can close.
 
 ## Your OS is not something you manage
 
@@ -42,5 +49,8 @@ OS-specific commands are the ones you type yourself, and those are the two instr
 
 ## If your build goes sideways
 
-`git checkout dotnet-demo` has the finished app. Read the fallback notes in your instructions file
-first — a partly-built `AssetDesk/` will block the checkout, and there is one command that fixes it.
+Each checkpoint has a finished reference build to fall back on — `checkpoint-3` for checkpoints 1 and
+2, `checkpoint-4-result` for checkpoint 4. Commit your own work first (see
+[CHECKPOINTS.md](CHECKPOINTS.md#switching-checkpoints)) so nothing is lost and the switch is clean.
+
+`dotnet-demo` still holds the original single-exercise build against the unthinned spec.
