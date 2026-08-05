@@ -357,7 +357,7 @@ Get-ChildItem AssetDesk -Recurse -Include '*.razor.css', '*.razor.js'    # must 
 | `/api/state` shows 13 assets, not 12 | An old database survived. `Get-ChildItem AssetDesk -Recurse -Filter 'assetdesk.db*' \| Remove-Item -Force` and restart. |
 | `curl : A parameter cannot be found that matches parameter name 's'` | `curl` is an alias for `Invoke-WebRequest` in PowerShell 5.1. Use `curl.exe`, or §4's `Invoke-RestMethod`. |
 | `Remove-Item` → `The process cannot access the file` | The app, `dotnet watch`, an open Explorer window, or OneDrive has a handle on `bin\`. Stop them and retry; move the clone out of OneDrive (§7). |
-| `MSBUILD : error MSB1003: Specify a project or solution file` | You ran `dotnet build` with no project. Everything here is root-relative: `dotnet build AssetDesk`, `dotnet run --project AssetDesk`. |
+| `MSBUILD : error MSB1003: Specify a project or solution file` | You ran `dotnet build` with no project, and the repo root holds none. Everything here is root-relative, so name it: `dotnet build AssetDesk`, `dotnet run --project AssetDesk`. `checkpoint-3` carries a second app — that one is `dotnet build reference\AssetDesk-noskills`. |
 | `dotnet` or `claude` not recognized after installing | New terminal. winget and the .NET installer update the machine PATH; the session you ran them in never re-reads it. |
 | Browser warns about the certificate | You dropped `--urls http://localhost:5198` and launchSettings picked the HTTPS profile. Put `--urls` back, or run `dotnet dev-certs https --trust` once. |
 | Windows Defender Firewall prompts on first run | Cancel is fine. `--urls http://localhost:5198` binds loopback only, and loopback needs no exception. |
@@ -372,7 +372,6 @@ Get-ChildItem AssetDesk -Recurse -Include '*.razor.css', '*.razor.js'    # must 
 | Anything else odd in Claude Code | `/doctor` — it diagnoses install and config and can apply fixes itself. |
 | `/review-build` is missing from the `/` list after switching checkpoints | Skills register at startup only. `/exit`, then `claude`. `/clear` will not do it. |
 | `git switch checkpoint-N` refuses over your build | You did not commit it. `git add -A; git commit -m wip`, then switch. Your build stays on the branch you left. |
-| `MSBUILD : error MSB1011: more than one project` | `checkpoint-3` holds two apps. Name the one you mean: `dotnet build AssetDesk` or `dotnet build reference\AssetDesk-noskills`. |
 
 ---
 

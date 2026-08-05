@@ -317,7 +317,7 @@ find AssetDesk -name '*.razor.css' -o -name '*.razor.js'      # must print nothi
 | `/api/health` answers but `/api/state` 500s with `SQLite Error 14: 'unable to open database file'` | You are talking to a **stale process from a directory that no longer exists**, not your app. `lsof` for the PID, confirm with `ps aux \| grep AssetDesk`, kill it. |
 | `/api/state` shows 13 assets, not 12 | An old database survived. `find AssetDesk -name 'assetdesk.db*' -delete` and restart. |
 | `rm -f …/[Dd]ata/assetdesk.db*` → `zsh: no matches found` | zsh aborts on an unmatched glob and `rm` never runs, so nothing was deleted. Use `find AssetDesk -name 'assetdesk.db*' -delete`. |
-| `MSBUILD : error MSB1003: Specify a project or solution file` | You ran `dotnet build` with no project. Everything here is root-relative: `dotnet build AssetDesk`, `dotnet run --project AssetDesk`. |
+| `MSBUILD : error MSB1003: Specify a project or solution file` | You ran `dotnet build` with no project, and the repo root holds none. Everything here is root-relative, so name it: `dotnet build AssetDesk`, `dotnet run --project AssetDesk`. `checkpoint-3` carries a second app — that one is `dotnet build reference/AssetDesk-noskills`. |
 | Buttons and tabs do nothing, but the build is clean | No interactive render mode. `Components/App.razor` needs `@rendermode="InteractiveServer"` on both `<HeadOutlet>` and `<Routes>` (SPEC.md §3.3 item 1). Invisible in build output — the #1 Blazor trap. |
 | Search only filters when you click away | `@bind:event="oninput"` is missing on the search input (SPEC.md §3.3 item 5). |
 | `NU1903` NuGet audit warning breaks the zero-warning goal | Known: `SQLitePCLRaw.lib.e_sqlite3` is pinned transitively by `Microsoft.Data.Sqlite` 10.0.10 and has no newer patch. `dotnet-demo` suppresses it with `<NoWarn>$(NoWarn);NU1903</NoWarn>` and a comment saying why. |
@@ -329,7 +329,6 @@ find AssetDesk -name '*.razor.css' -o -name '*.razor.js'      # must print nothi
 | Anything else odd in Claude Code | `/doctor` — it diagnoses install and config and can apply fixes itself. |
 | `/review-build` is missing from the `/` list after switching checkpoints | Skills register at startup only. `/exit`, then `claude`. `/clear` will not do it. |
 | `git switch checkpoint-N` refuses over your build | You did not commit it. `git add -A && git commit -m wip`, then switch. Your build stays on the branch you left. |
-| `MSBUILD : error MSB1011: more than one project` | `checkpoint-3` holds two apps. Name the one you mean: `dotnet build AssetDesk` or `dotnet build reference/AssetDesk-noskills`. |
 
 ---
 
