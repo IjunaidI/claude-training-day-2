@@ -1,0 +1,72 @@
+<table class="table">
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Title</th>
+            <th>Department</th>
+            <th>Email</th>
+            <th>Assets held</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var employee in Employees)
+        {
+            var assignedAssets = AssignedAssetsFor(employee.Id);
+            <tr class="clickable" @onclick="() => ToggleExpand(employee.Id)">
+                <td>@employee.Name</td>
+                <td>@employee.Title</td>
+                <td>@employee.Department</td>
+                <td>@employee.Email</td>
+                <td>@assignedAssets.Count</td>
+            </tr>
+            @if (_expandedId == employee.Id)
+            {
+                <tr>
+                    <td colspan="5">
+                        <div class="expand-panel">
+                            @if (assignedAssets.Count == 0)
+                            {
+                                <p>No assets assigned</p>
+                            }
+                            else
+                            {
+                                <ul>
+                                    @foreach (var asset in assignedAssets)
+                                    {
+                                        <li>
+                                            <span><span class="mono">@asset.Tag</span> — @asset.Make @asset.Model</span>
+                                            <button type="button" class="btn btn-sm" @onclick="() => HandleReturn(asset)">Return</button>
+                                        </li>
+                                    }
+                                </ul>
+                            }
+                        </div>
+                    </td>
+                </tr>
+            }
+        }
+    </tbody>
+</table>
+
+@code {
+    [Parameter] public List<EmployeeDto> Employees { get; set; } = [];
+    [Parameter] public List<AssetDto> AssetList { get; set; } = [];
+    [Parameter] public EventCallback OnStateChanged { get; set; }
+    [Parameter] public CancellationToken Ct { get; set; }
+
+    [Inject] private AssetDeskClient Client { get; set; } = default!;
+
+    private string? _expandedId;
+
+    private List<AssetDto> AssignedAssetsFor(string employeeId) =>
+        AssetList.Where(a => a.AssignedTo == employeeId).ToList();
+
+    private void ToggleExpand(string employeeId) =>
+        _expandedId = _expandedId == employeeId ? null : employeeId;
+
+    private async Task HandleReturn(AssetDto asset)
+    {
+        await Client.ReturnAsync(asset.Id, Ct);
+        await OnStateChanged.InvokeAsync();
+    }
+}
