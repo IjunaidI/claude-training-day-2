@@ -22,6 +22,11 @@ Read SPEC.md and build it.
 | 3 | `checkpoint-3` | same as 2, plus two finished apps | Review code you did not write. No build |
 | 4 | `checkpoint-4` | + `csharp-quality`, `blazor-component-hygiene` | Run the same prompt. Review |
 
+Each checkpoint ships its deck under `slides/`, and later branches carry the earlier ones too.
+The decks cover what is happening while the build runs rather than repeating this runbook:
+context rot, spec-driven development, writing a spec with AI, and the review kit at checkpoint 1,
+then one new layer per checkpoint.
+
 ### Checkpoint 1 — the spec alone
 
 The spec is detailed and still does not say whether the UI should talk to the database directly or go
