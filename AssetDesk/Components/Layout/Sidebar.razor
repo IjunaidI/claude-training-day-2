@@ -1,0 +1,22 @@
+<div class="sidebar">
+    <div class="wordmark">AssetDesk</div>
+    <button type="button" class="tab-button @(ActiveTab == Tab.Dashboard ? "active" : "")"
+            @onclick="() => OnTabChange.InvokeAsync(Tab.Dashboard)">
+        Dashboard
+    </button>
+    <button type="button" class="tab-button @(ActiveTab == Tab.Assets ? "active" : "")"
+            @onclick="() => OnTabChange.InvokeAsync(Tab.Assets)">
+        Assets
+    </button>
+    <button type="button" class="tab-button @(ActiveTab == Tab.People ? "active" : "")"
+            @onclick="() => OnTabChange.InvokeAsync(Tab.People)">
+        People
+    </button>
+</div>
+
+@code {
+    public enum Tab { Dashboard, Assets, People }
+
+    [Parameter] public Tab ActiveTab { get; set; }
+    [Parameter] public EventCallback<Tab> OnTabChange { get; set; }
+}
