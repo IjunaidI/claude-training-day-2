@@ -9,11 +9,12 @@
     @switch (_activeTab)
     {
         case Sidebar.Tab.Dashboard:
-            <p>Dashboard placeholder</p>
+            <Dashboard State="_state" OnCategoryClick="GoToAssetsWithCategory" />
             break;
         case Sidebar.Tab.Assets:
             <AssetsTable AssetList="_state.Assets"
                          Employees="_state.Employees"
+                         InitialCategoryFilter="_categoryFilter"
                          ErrorMessage="@_errorMessage"
                          OnDismissError="() => _errorMessage = null"
                          OnAddAssetClick="() => _drawerOpen = true"
@@ -22,7 +23,7 @@
                          OnSetStatusClick="HandleSetStatus" />
             break;
         case Sidebar.Tab.People:
-            <p>People placeholder</p>
+            <People State="_state" OnReturnClick="HandleReturn" />
             break;
     }
 </div>
@@ -43,13 +44,24 @@
     private string? _errorMessage;
     private bool _drawerOpen;
     private Asset? _assigningAsset;
+    private Category? _categoryFilter;
 
     protected override void OnInitialized()
     {
         _state = Repo.GetState();
     }
 
-    private void SetTab(Sidebar.Tab tab) => _activeTab = tab;
+    private void SetTab(Sidebar.Tab tab)
+    {
+        _activeTab = tab;
+        _categoryFilter = null;
+    }
+
+    private void GoToAssetsWithCategory(Category category)
+    {
+        _categoryFilter = category;
+        _activeTab = Sidebar.Tab.Assets;
+    }
 
     private void Refresh() => _state = Repo.GetState();
 

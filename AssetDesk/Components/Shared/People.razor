@@ -1,0 +1,62 @@
+<table class="table">
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Title</th>
+            <th>Department</th>
+            <th>Email</th>
+            <th>Assets held</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var emp in State.Employees)
+        {
+            <tr class="clickable" @onclick="() => ToggleExpand(emp.Id)">
+                <td>@emp.Name</td>
+                <td>@emp.Title</td>
+                <td>@emp.Department</td>
+                <td>@emp.Email</td>
+                <td class="mono">@AssetsFor(emp.Id).Count</td>
+            </tr>
+            @if (_expandedId == emp.Id)
+            {
+                <tr>
+                    <td colspan="5">
+                        <div class="expand-panel">
+                            @{ var assets = AssetsFor(emp.Id); }
+                            @if (assets.Count == 0)
+                            {
+                                <p>No assets assigned</p>
+                            }
+                            else
+                            {
+                                <ul>
+                                    @foreach (var asset in assets)
+                                    {
+                                        <li>
+                                            <span><span class="mono">@asset.Tag</span> — @asset.Make @asset.Model</span>
+                                            <button type="button" class="btn" @onclick="() => OnReturnClick.InvokeAsync(asset)">Return</button>
+                                        </li>
+                                    }
+                                </ul>
+                            }
+                        </div>
+                    </td>
+                </tr>
+            }
+        }
+    </tbody>
+</table>
+
+@code {
+    [Parameter, EditorRequired] public AppState State { get; set; } = new([], []);
+    [Parameter] public EventCallback<Asset> OnReturnClick { get; set; }
+
+    private string? _expandedId;
+
+    private void ToggleExpand(string employeeId) =>
+        _expandedId = _expandedId == employeeId ? null : employeeId;
+
+    private List<Asset> AssetsFor(string employeeId) =>
+        State.Assets.Where(a => a.AssignedTo == employeeId).ToList();
+}
