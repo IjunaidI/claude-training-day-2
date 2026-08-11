@@ -173,6 +173,9 @@ public class AssetRepository(string connectionString)
 
     public Asset SetStatus(string assetId, Status status)
     {
+        if (status == Status.Assigned)
+            throw new AssetDeskException("Use the assign endpoint to set an asset to assigned.");
+
         using var conn = new SqliteConnection(connectionString);
         conn.Open();
         using var tx = conn.BeginTransaction();
