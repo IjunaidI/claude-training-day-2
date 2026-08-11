@@ -16,6 +16,7 @@
                          Employees="_state.Employees"
                          ErrorMessage="@_errorMessage"
                          OnDismissError="() => _errorMessage = null"
+                         OnAddAssetClick="() => _drawerOpen = true"
                          OnReturnClick="HandleReturn"
                          OnSetStatusClick="HandleSetStatus" />
             break;
@@ -25,10 +26,16 @@
     }
 </div>
 
+<AddAssetDrawer IsOpen="_drawerOpen"
+                ExistingAssets="_state.Assets"
+                OnClose="() => _drawerOpen = false"
+                OnCreated="Refresh" />
+
 @code {
     private Sidebar.Tab _activeTab = Sidebar.Tab.Dashboard;
     private AppState _state = new([], []);
     private string? _errorMessage;
+    private bool _drawerOpen;
 
     protected override void OnInitialized()
     {

@@ -1,0 +1,207 @@
+@inject AssetRepository Repo
+
+@if (IsOpen)
+{
+    <div class="backdrop" @onclick="Close"></div>
+    <div class="drawer" tabindex="-1" @ref="_drawerRef" @onkeydown="HandleKeyDown">
+        <h2 class="section-heading">Add asset</h2>
+
+        <div class="field">
+            <label>Tag</label>
+            <input @bind="_tag" />
+            @if (_errors.TryGetValue("Tag", out var tagErr)) { <div class="field-error">@tagErr</div> }
+        </div>
+
+        <div class="field">
+            <label>Category</label>
+            <select @bind="_category">
+                @foreach (var c in Enum.GetValues<Category>())
+                {
+                    <option value="@c">@Format.Label(c)</option>
+                }
+            </select>
+        </div>
+
+        <div class="field">
+            <label>Make</label>
+            <input @bind="_make" />
+            @if (_errors.TryGetValue("Make", out var makeErr)) { <div class="field-error">@makeErr</div> }
+        </div>
+
+        <div class="field">
+            <label>Model</label>
+            <input @bind="_model" />
+            @if (_errors.TryGetValue("Model", out var modelErr)) { <div class="field-error">@modelErr</div> }
+        </div>
+
+        <div class="field">
+            <label>Serial</label>
+            <input @bind="_serial" />
+            @if (_errors.TryGetValue("Serial", out var serialErr)) { <div class="field-error">@serialErr</div> }
+        </div>
+
+        <div class="field">
+            <label>Condition</label>
+            <select @bind="_condition">
+                @foreach (var c in Enum.GetValues<Condition>())
+                {
+                    <option value="@c">@Format.Label(c)</option>
+                }
+            </select>
+        </div>
+
+        <div class="field">
+            <label>Purchase date</label>
+            <input type="date" value="@_purchaseDate" @onchange="e => _purchaseDate = e.Value?.ToString() ?? string.Empty" />
+            @if (_errors.TryGetValue("PurchaseDate", out var dateErr)) { <div class="field-error">@dateErr</div> }
+        </div>
+
+        <div class="field">
+            <label>Cost</label>
+            <input type="number" min="0" step="0.01" @bind="_cost" />
+            @if (_errors.TryGetValue("Cost", out var costErr)) { <div class="field-error">@costErr</div> }
+        </div>
+
+        <div class="field">
+            <label>Location</label>
+            <input @bind="_location" />
+            @if (_errors.TryGetValue("Location", out var locationErr)) { <div class="field-error">@locationErr</div> }
+        </div>
+
+        <div class="field">
+            <label>Notes</label>
+            <textarea rows="3" @bind="_notes"></textarea>
+        </div>
+
+        <div class="field">
+            <label>Quantity</label>
+            <input type="number" min="1" max="20" @bind="_quantity" />
+            @if (_errors.TryGetValue("Quantity", out var qtyErr)) { <div class="field-error">@qtyErr</div> }
+        </div>
+
+        <div class="drawer-actions">
+            <button type="button" class="btn" @onclick="Close">Cancel</button>
+            <button type="button" class="btn btn-primary" @onclick="Submit">Add asset</button>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public List<Asset> ExistingAssets { get; set; } = [];
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public EventCallback OnCreated { get; set; }
+
+    private ElementReference _drawerRef;
+    private bool _wasOpen;
+    private bool _shouldFocus;
+
+    private string _tag = "";
+    private Category _category = Category.Laptop;
+    private string _make = "";
+    private string _model = "";
+    private string _serial = "";
+    private Condition _condition = Condition.New;
+    private string _purchaseDate = Format.TodayIso();
+    private double _cost;
+    private string _location = "HQ / Store Room";
+    private string _notes = "";
+    private int _quantity = 1;
+
+    private readonly Dictionary<string, string> _errors = new();
+
+    protected override void OnParametersSet()
+    {
+        if (IsOpen && !_wasOpen)
+        {
+            ResetForm();
+            _shouldFocus = true;
+        }
+        _wasOpen = IsOpen;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_shouldFocus)
+        {
+            _shouldFocus = false;
+            await _drawerRef.FocusAsync();
+        }
+    }
+
+    private void ResetForm()
+    {
+        _tag = NextTag();
+        _category = Category.Laptop;
+        _make = "";
+        _model = "";
+        _serial = "";
+        _condition = Condition.New;
+        _purchaseDate = Format.TodayIso();
+        _cost = 0;
+        _location = "HQ / Store Room";
+        _notes = "";
+        _quantity = 1;
+        _errors.Clear();
+    }
+
+    private string NextTag()
+    {
+        var next = ExistingAssets
+            .Select(a => int.TryParse(a.Tag.Split('-').LastOrDefault(), out var n) ? n : 0)
+            .DefaultIfEmpty(1000)
+            .Max() + 1;
+        return $"AST-{next}";
+    }
+
+    private bool Validate()
+    {
+        _errors.Clear();
+        if (string.IsNullOrWhiteSpace(_tag)) _errors["Tag"] = "Tag is required.";
+        if (string.IsNullOrWhiteSpace(_make)) _errors["Make"] = "Make is required.";
+        if (string.IsNullOrWhiteSpace(_model)) _errors["Model"] = "Model is required.";
+        if (string.IsNullOrWhiteSpace(_serial)) _errors["Serial"] = "Serial is required.";
+        if (!Format.TryParseIsoDate(_purchaseDate, out _)) _errors["PurchaseDate"] = "Purchase date is required.";
+        if (_cost < 0) _errors["Cost"] = "Cost must be a number of 0 or more.";
+        if (string.IsNullOrWhiteSpace(_location)) _errors["Location"] = "Location is required.";
+        if (_quantity is < 1 or > 20) _errors["Quantity"] = "Quantity must be between 1 and 20.";
+        return _errors.Count == 0;
+    }
+
+    private async Task Submit()
+    {
+        if (!Validate())
+        {
+            return;
+        }
+
+        var input = new NewAssetInput(
+            _tag, _category, _make, _model, _serial, _condition, _purchaseDate, _cost, _location, _notes, _quantity);
+
+        try
+        {
+            Repo.CreateAssets(input);
+        }
+        catch (AssetDeskException ex)
+        {
+            _errors["Tag"] = ex.Message;
+            return;
+        }
+
+        await OnClose.InvokeAsync();
+        await OnCreated.InvokeAsync();
+    }
+
+    private async Task Close()
+    {
+        await OnClose.InvokeAsync();
+    }
+
+    private async Task HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape")
+        {
+            await Close();
+        }
+    }
+}
