@@ -154,6 +154,8 @@ a { color: inherit; }
 
 .cell-muted { color: var(--muted); font-size: 12px; }
 
+.actions-cell { display: flex; gap: 6px; flex-wrap: wrap; }
+
 /* Pills */
 
 .pill {

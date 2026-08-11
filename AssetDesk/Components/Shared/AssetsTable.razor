@@ -1,0 +1,155 @@
+@if (ErrorMessage is not null)
+{
+    <div class="banner">
+        <span>@ErrorMessage</span>
+        <button type="button" @onclick="OnDismissError">Dismiss</button>
+    </div>
+}
+
+<div class="toolbar">
+    <input class="search-input" placeholder="Search tag, make, model, serial"
+           @bind="_search" @bind:event="oninput" />
+    <select @bind="_categoryFilter">
+        <option value="">All categories</option>
+        @foreach (var c in Enum.GetValues<Category>())
+        {
+            <option value="@c">@Format.Label(c)</option>
+        }
+    </select>
+    <select @bind="_statusFilter">
+        <option value="">All statuses</option>
+        @foreach (var s in Enum.GetValues<Status>())
+        {
+            <option value="@s">@Format.Label(s)</option>
+        }
+    </select>
+    <div class="spacer"></div>
+    <button type="button" class="btn btn-primary" @onclick="OnAddAssetClick">Add asset</button>
+</div>
+
+@if (SortedAssets.Count == 0)
+{
+    <div class="empty-state">
+        <h3>No assets match these filters</h3>
+        <button type="button" class="btn" @onclick="ClearFilters">Clear filters</button>
+    </div>
+}
+else
+{
+    <p class="result-count">Showing @SortedAssets.Count of @AssetList.Count assets</p>
+    <table class="table">
+        <thead>
+            <tr>
+                <th class="sortable" @onclick='() => ToggleSort("Tag")'>Tag</th>
+                <th class="sortable" @onclick='() => ToggleSort("Category")'>Category</th>
+                <th>Device</th>
+                <th class="sortable" @onclick='() => ToggleSort("Status")'>Status</th>
+                <th>Assigned to</th>
+                <th>Since</th>
+                <th>Location</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var asset in SortedAssets)
+            {
+                <tr class="@(asset.Status == Status.Retired ? "retired" : "")">
+                    <td class="mono">@asset.Tag</td>
+                    <td>@Format.Label(asset.Category)</td>
+                    <td>
+                        <div>@asset.Make @asset.Model</div>
+                        <div class="cell-muted">@asset.Serial</div>
+                    </td>
+                    <td><StatusPill Status="asset.Status" /></td>
+                    <td>@EmployeeName(asset.AssignedTo)</td>
+                    <td class="mono">@(asset.AssignedDate ?? "—")</td>
+                    <td>@asset.Location</td>
+                    <td>
+                        <div class="actions-cell">
+                            @switch (asset.Status)
+                            {
+                                case Status.InStock:
+                                    <button type="button" class="btn" @onclick="() => OnAssignClick.InvokeAsync(asset)">Assign</button>
+                                    <button type="button" class="btn" @onclick="() => OnSetStatusClick.InvokeAsync((asset, Status.Repair))">Mark repair</button>
+                                    <button type="button" class="btn btn-danger" @onclick="() => OnSetStatusClick.InvokeAsync((asset, Status.Retired))">Retire</button>
+                                    break;
+                                case Status.Assigned:
+                                    <button type="button" class="btn" @onclick="() => OnReturnClick.InvokeAsync(asset)">Return</button>
+                                    <button type="button" class="btn btn-danger" @onclick="() => OnSetStatusClick.InvokeAsync((asset, Status.Retired))">Retire</button>
+                                    break;
+                                case Status.Repair:
+                                    <button type="button" class="btn" @onclick="() => OnSetStatusClick.InvokeAsync((asset, Status.InStock))">Mark in stock</button>
+                                    <button type="button" class="btn btn-danger" @onclick="() => OnSetStatusClick.InvokeAsync((asset, Status.Retired))">Retire</button>
+                                    break;
+                            }
+                        </div>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    [Parameter, EditorRequired] public List<Asset> AssetList { get; set; } = [];
+    [Parameter, EditorRequired] public List<Employee> Employees { get; set; } = [];
+    [Parameter] public Category? InitialCategoryFilter { get; set; }
+    [Parameter] public string? ErrorMessage { get; set; }
+    [Parameter] public EventCallback OnDismissError { get; set; }
+    [Parameter] public EventCallback OnAddAssetClick { get; set; }
+    [Parameter] public EventCallback<Asset> OnAssignClick { get; set; }
+    [Parameter] public EventCallback<Asset> OnReturnClick { get; set; }
+    [Parameter] public EventCallback<(Asset Asset, Status Status)> OnSetStatusClick { get; set; }
+
+    private string _search = "";
+    private Category? _categoryFilter;
+    private Status? _statusFilter;
+    private string _sortColumn = "Tag";
+    private bool _sortAscending = true;
+
+    protected override void OnInitialized()
+    {
+        _categoryFilter = InitialCategoryFilter;
+    }
+
+    private Dictionary<string, Employee> EmployeeById => Employees.ToDictionary(e => e.Id);
+
+    private string EmployeeName(string? employeeId) =>
+        employeeId is not null && EmployeeById.TryGetValue(employeeId, out var emp) ? emp.Name : "—";
+
+    private IEnumerable<Asset> FilteredAssets => AssetList
+        .Where(a => _categoryFilter is null || a.Category == _categoryFilter)
+        .Where(a => _statusFilter is null || a.Status == _statusFilter)
+        .Where(a => string.IsNullOrWhiteSpace(_search) ||
+            a.Tag.Contains(_search, StringComparison.OrdinalIgnoreCase) ||
+            a.Make.Contains(_search, StringComparison.OrdinalIgnoreCase) ||
+            a.Model.Contains(_search, StringComparison.OrdinalIgnoreCase) ||
+            a.Serial.Contains(_search, StringComparison.OrdinalIgnoreCase));
+
+    private List<Asset> SortedAssets => (_sortColumn switch
+    {
+        "Category" => _sortAscending ? FilteredAssets.OrderBy(a => a.Category) : FilteredAssets.OrderByDescending(a => a.Category),
+        "Status" => _sortAscending ? FilteredAssets.OrderBy(a => a.Status) : FilteredAssets.OrderByDescending(a => a.Status),
+        _ => _sortAscending ? FilteredAssets.OrderBy(a => a.Tag) : FilteredAssets.OrderByDescending(a => a.Tag),
+    }).ToList();
+
+    private void ToggleSort(string column)
+    {
+        if (_sortColumn == column)
+        {
+            _sortAscending = !_sortAscending;
+        }
+        else
+        {
+            _sortColumn = column;
+            _sortAscending = true;
+        }
+    }
+
+    private void ClearFilters()
+    {
+        _search = "";
+        _categoryFilter = null;
+        _statusFilter = null;
+    }
+}

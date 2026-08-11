@@ -12,7 +12,12 @@
             <p>Dashboard placeholder</p>
             break;
         case Sidebar.Tab.Assets:
-            <p>Assets placeholder</p>
+            <AssetsTable AssetList="_state.Assets"
+                         Employees="_state.Employees"
+                         ErrorMessage="@_errorMessage"
+                         OnDismissError="() => _errorMessage = null"
+                         OnReturnClick="HandleReturn"
+                         OnSetStatusClick="HandleSetStatus" />
             break;
         case Sidebar.Tab.People:
             <p>People placeholder</p>
@@ -23,6 +28,7 @@
 @code {
     private Sidebar.Tab _activeTab = Sidebar.Tab.Dashboard;
     private AppState _state = new([], []);
+    private string? _errorMessage;
 
     protected override void OnInitialized()
     {
@@ -30,4 +36,32 @@
     }
 
     private void SetTab(Sidebar.Tab tab) => _activeTab = tab;
+
+    private void Refresh() => _state = Repo.GetState();
+
+    private void HandleReturn(Asset asset)
+    {
+        try
+        {
+            Repo.Return(asset.Id);
+            Refresh();
+        }
+        catch (AssetDeskException ex)
+        {
+            _errorMessage = ex.Message;
+        }
+    }
+
+    private void HandleSetStatus((Asset Asset, Status Status) request)
+    {
+        try
+        {
+            Repo.SetStatus(request.Asset.Id, request.Status);
+            Refresh();
+        }
+        catch (AssetDeskException ex)
+        {
+            _errorMessage = ex.Message;
+        }
+    }
 }
