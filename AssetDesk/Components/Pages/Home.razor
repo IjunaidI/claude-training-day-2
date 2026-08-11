@@ -17,6 +17,7 @@
                          ErrorMessage="@_errorMessage"
                          OnDismissError="() => _errorMessage = null"
                          OnAddAssetClick="() => _drawerOpen = true"
+                         OnAssignClick="asset => _assigningAsset = asset"
                          OnReturnClick="HandleReturn"
                          OnSetStatusClick="HandleSetStatus" />
             break;
@@ -31,11 +32,17 @@
                 OnClose="() => _drawerOpen = false"
                 OnCreated="Refresh" />
 
+<AssignDialog Asset="_assigningAsset"
+              Employees="_state.Employees"
+              OnCancel="() => _assigningAsset = null"
+              OnConfirm="HandleAssignConfirm" />
+
 @code {
     private Sidebar.Tab _activeTab = Sidebar.Tab.Dashboard;
     private AppState _state = new([], []);
     private string? _errorMessage;
     private bool _drawerOpen;
+    private Asset? _assigningAsset;
 
     protected override void OnInitialized()
     {
@@ -69,6 +76,28 @@
         catch (AssetDeskException ex)
         {
             _errorMessage = ex.Message;
+        }
+    }
+
+    private void HandleAssignConfirm((string EmployeeId, string AssignedDate) request)
+    {
+        if (_assigningAsset is null)
+        {
+            return;
+        }
+
+        try
+        {
+            Repo.Assign(_assigningAsset.Id, request.EmployeeId, request.AssignedDate);
+            Refresh();
+        }
+        catch (AssetDeskException ex)
+        {
+            _errorMessage = ex.Message;
+        }
+        finally
+        {
+            _assigningAsset = null;
         }
     }
 }
