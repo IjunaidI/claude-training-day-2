@@ -1,0 +1,60 @@
+@page "/"
+@implements IDisposable
+
+<PageTitle>AssetDesk</PageTitle>
+
+<div class="app-shell">
+    <Sidebar ActiveTab="@_activeTab" OnTabChange="ChangeTab" />
+    <div class="content">
+        @if (_state is null)
+        {
+            <p>Loading…</p>
+        }
+        else if (_activeTab == "dashboard")
+        {
+            <Dashboard State="@_state" OnCategorySelected="GoToAssetsForCategory" />
+        }
+        else if (_activeTab == "assets")
+        {
+            <AssetsTable State="@_state" InitialCategoryFilter="@_assetsCategoryFilter" OnChanged="RefreshAsync" />
+        }
+        else
+        {
+            <People State="@_state" OnChanged="RefreshAsync" />
+        }
+    </div>
+</div>
+
+@code {
+    [Inject] private AssetDeskClient Client { get; set; } = null!;
+
+    private AppStateDto? _state;
+    private string _activeTab = "dashboard";
+    private Category? _assetsCategoryFilter;
+    private readonly CancellationTokenSource _cts = new();
+
+    protected override async Task OnInitializedAsync() => await RefreshAsync();
+
+    private async Task RefreshAsync()
+    {
+        _state = await Client.GetStateAsync(_cts.Token);
+        StateHasChanged();
+    }
+
+    private void ChangeTab(string tab)
+    {
+        _activeTab = tab;
+        if (tab != "assets")
+        {
+            _assetsCategoryFilter = null;
+        }
+    }
+
+    private void GoToAssetsForCategory(Category category)
+    {
+        _assetsCategoryFilter = category;
+        _activeTab = "assets";
+    }
+
+    public void Dispose() => _cts.Cancel();
+}

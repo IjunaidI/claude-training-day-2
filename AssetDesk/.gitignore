@@ -1,0 +1,5 @@
+bin/
+obj/
+assetdesk.db
+assetdesk.db-shm
+assetdesk.db-wal

@@ -1,0 +1,75 @@
+@if (Asset is not null)
+{
+    <div class="backdrop" @onclick="Cancel"></div>
+    <div class="modal">
+        <h3>Assign asset</h3>
+        <p class="mono">@Asset.Tag — @Asset.Make @Asset.Model</p>
+
+        <div class="field">
+            <label for="assign-employee">Employee</label>
+            <select id="assign-employee" @bind="_employeeId">
+                <option value="">Select an employee</option>
+                @foreach (var e in Employees)
+                {
+                    <option value="@e.Id">@e.Name — @e.Department</option>
+                }
+            </select>
+        </div>
+
+        <div class="field">
+            <label for="assign-date">Assignment date</label>
+            <input id="assign-date" type="date" @bind="_assignedDate" />
+        </div>
+
+        @if (_error is not null)
+        {
+            <div class="field error">@_error</div>
+        }
+
+        <div class="modal-actions">
+            <button class="btn" @onclick="Cancel">Cancel</button>
+            <button class="btn btn-primary" disabled="@string.IsNullOrEmpty(_employeeId)" @onclick="Confirm">
+                Assign asset
+            </button>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public AssetDto? Asset { get; set; }
+    [Parameter] public List<EmployeeDto> Employees { get; set; } = new();
+    [Parameter] public EventCallback OnCancelled { get; set; }
+    [Parameter] public EventCallback OnAssigned { get; set; }
+
+    [Inject] private AssetDeskClient Client { get; set; } = null!;
+
+    private string _employeeId = "";
+    private DateTime _assignedDate = DateTime.Today;
+    private string? _error;
+
+    protected override void OnParametersSet()
+    {
+        if (Asset is null)
+        {
+            _employeeId = "";
+            _assignedDate = DateTime.Today;
+            _error = null;
+        }
+    }
+
+    private async Task Cancel() => await OnCancelled.InvokeAsync();
+
+    private async Task Confirm()
+    {
+        try
+        {
+            await Client.AssignAsync(Asset!.Id, _employeeId, Format.ToIsoDate(_assignedDate), CancellationToken.None);
+            _error = null;
+            await OnAssigned.InvokeAsync();
+        }
+        catch (AssetDeskException ex)
+        {
+            _error = ex.Message;
+        }
+    }
+}

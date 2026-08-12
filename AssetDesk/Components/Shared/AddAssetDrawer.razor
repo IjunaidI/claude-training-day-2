@@ -1,0 +1,211 @@
+@using System.Text.RegularExpressions
+
+<div class="backdrop" @onclick="RequestClose"></div>
+<div class="drawer" tabindex="-1" @ref="_drawerRef" @onkeydown="HandleKeyDown">
+    <div class="drawer-header">
+        <h3>Add asset</h3>
+        <button class="btn" @onclick="RequestClose">Close</button>
+    </div>
+
+    <div class="field">
+        <label for="add-tag">Tag</label>
+        <input id="add-tag" type="text" @bind="_tag" @bind:event="oninput" />
+        @if (_fieldErrors.TryGetValue("Tag", out var tagError))
+        {
+            <span class="error">@tagError</span>
+        }
+    </div>
+
+    <div class="field">
+        <label for="add-category">Category</label>
+        <select id="add-category" @bind="_category">
+            @foreach (var c in Enum.GetValues<Category>())
+            {
+                <option value="@c">@c</option>
+            }
+        </select>
+    </div>
+
+    <div class="field">
+        <label for="add-make">Make</label>
+        <input id="add-make" type="text" @bind="_make" />
+        @if (_fieldErrors.TryGetValue("Make", out var makeError))
+        {
+            <span class="error">@makeError</span>
+        }
+    </div>
+
+    <div class="field">
+        <label for="add-model">Model</label>
+        <input id="add-model" type="text" @bind="_model" />
+        @if (_fieldErrors.TryGetValue("Model", out var modelError))
+        {
+            <span class="error">@modelError</span>
+        }
+    </div>
+
+    <div class="field">
+        <label for="add-serial">Serial</label>
+        <input id="add-serial" type="text" @bind="_serial" />
+        @if (_fieldErrors.TryGetValue("Serial", out var serialError))
+        {
+            <span class="error">@serialError</span>
+        }
+    </div>
+
+    <div class="field">
+        <label for="add-condition">Condition</label>
+        <select id="add-condition" @bind="_condition">
+            @foreach (var c in Enum.GetValues<Condition>())
+            {
+                <option value="@c">@Format.Label(c)</option>
+            }
+        </select>
+    </div>
+
+    <div class="field">
+        <label for="add-purchase-date">Purchase date</label>
+        <input id="add-purchase-date" type="date" @bind="_purchaseDate" />
+    </div>
+
+    <div class="field">
+        <label for="add-cost">Cost</label>
+        <input id="add-cost" type="number" min="0" @bind="_cost" />
+        @if (_fieldErrors.TryGetValue("Cost", out var costError))
+        {
+            <span class="error">@costError</span>
+        }
+    </div>
+
+    <div class="field">
+        <label for="add-location">Location</label>
+        <input id="add-location" type="text" @bind="_location" />
+        @if (_fieldErrors.TryGetValue("Location", out var locationError))
+        {
+            <span class="error">@locationError</span>
+        }
+    </div>
+
+    <div class="field">
+        <label for="add-notes">Notes</label>
+        <textarea id="add-notes" rows="3" @bind="_notes"></textarea>
+    </div>
+
+    <div class="field">
+        <label for="add-quantity">Quantity</label>
+        <input id="add-quantity" type="number" min="1" max="20" @bind="_quantity" />
+        @if (_fieldErrors.TryGetValue("Quantity", out var quantityError))
+        {
+            <span class="error">@quantityError</span>
+        }
+    </div>
+
+    <div class="drawer-actions">
+        <button class="btn" @onclick="RequestClose">Cancel</button>
+        <button class="btn btn-primary" @onclick="Submit">Add asset</button>
+    </div>
+</div>
+
+@code {
+    [Parameter] public List<AssetDto> ExistingAssets { get; set; } = new();
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public EventCallback OnCreated { get; set; }
+
+    [Inject] private AssetDeskClient Client { get; set; } = null!;
+
+    private ElementReference _drawerRef;
+
+    private string _tag = "";
+    private Category _category = Category.Laptop;
+    private string _make = "";
+    private string _model = "";
+    private string _serial = "";
+    private Condition _condition = Condition.New;
+    private DateTime _purchaseDate = DateTime.Today;
+    private double? _cost;
+    private string _location = "HQ / Store Room";
+    private string _notes = "";
+    private int _quantity = 1;
+
+    private Dictionary<string, string> _fieldErrors = new();
+
+    protected override void OnInitialized() => ResetForm();
+
+    private void ResetForm()
+    {
+        _tag = NextTag();
+        _category = Category.Laptop;
+        _make = "";
+        _model = "";
+        _serial = "";
+        _condition = Condition.New;
+        _purchaseDate = DateTime.Today;
+        _cost = null;
+        _location = "HQ / Store Room";
+        _notes = "";
+        _quantity = 1;
+        _fieldErrors.Clear();
+    }
+
+    private string NextTag()
+    {
+        var maxNumber = ExistingAssets
+            .Select(a => Regex.Match(a.Tag, @"(\d+)$"))
+            .Where(m => m.Success)
+            .Select(m => int.Parse(m.Groups[1].Value))
+            .DefaultIfEmpty(1000)
+            .Max();
+        return $"AST-{maxNumber + 1}";
+    }
+
+    private Dictionary<string, string> Validate()
+    {
+        var errors = new Dictionary<string, string>();
+        if (string.IsNullOrWhiteSpace(_tag)) errors["Tag"] = "Tag is required.";
+        if (string.IsNullOrWhiteSpace(_make)) errors["Make"] = "Make is required.";
+        if (string.IsNullOrWhiteSpace(_model)) errors["Model"] = "Model is required.";
+        if (string.IsNullOrWhiteSpace(_serial)) errors["Serial"] = "Serial is required.";
+        if (_cost is null || _cost < 0) errors["Cost"] = "Cost must be a number of 0 or more.";
+        if (string.IsNullOrWhiteSpace(_location)) errors["Location"] = "Location is required.";
+        if (_quantity is < 1 or > 20) errors["Quantity"] = "Quantity must be between 1 and 20.";
+        return errors;
+    }
+
+    private async Task Submit()
+    {
+        _fieldErrors = Validate();
+        if (_fieldErrors.Count > 0) return;
+
+        var input = new NewAssetInput(
+            _tag.Trim(), _category, _make.Trim(), _model.Trim(), _serial.Trim(),
+            _condition, Format.ToIsoDate(_purchaseDate), _cost!.Value, _location.Trim(), _notes.Trim(), _quantity);
+
+        try
+        {
+            await Client.CreateAssetsAsync(input, CancellationToken.None);
+            await OnCreated.InvokeAsync();
+        }
+        catch (AssetDeskException ex)
+        {
+            _fieldErrors["Tag"] = ex.Message;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await _drawerRef.FocusAsync();
+        }
+    }
+
+    private async Task HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape")
+        {
+            await RequestClose();
+        }
+    }
+
+    private async Task RequestClose() => await OnClose.InvokeAsync();
+}

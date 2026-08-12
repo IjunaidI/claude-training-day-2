@@ -1,0 +1,16 @@
+<span class="pill @CssClass">@Label</span>
+
+@code {
+    [Parameter] public Status Status { get; set; }
+
+    private string CssClass => Status switch
+    {
+        Status.InStock => "pill-instock",
+        Status.Assigned => "pill-assigned",
+        Status.Repair => "pill-repair",
+        Status.Retired => "pill-retired",
+        _ => "",
+    };
+
+    private string Label => Format.Label(Status);
+}

@@ -1,0 +1,71 @@
+<div class="tile-row">
+    <div class="tile">
+        <span class="tile-number">@TotalAssets</span>
+        <span class="tile-label">Total assets</span>
+    </div>
+    <div class="tile">
+        <span class="tile-number">@InStockCount</span>
+        <span class="tile-label">In stock</span>
+    </div>
+    <div class="tile">
+        <span class="tile-number">@AssignedCount</span>
+        <span class="tile-label">Assigned</span>
+    </div>
+    <div class="tile">
+        <span class="tile-number">@RepairCount</span>
+        <span class="tile-label">In repair</span>
+    </div>
+</div>
+
+<div class="section-heading">Stock by category</div>
+<table class="table">
+    <thead>
+        <tr>
+            <th>Category</th>
+            <th>Total owned</th>
+            <th>In stock</th>
+            <th>Assigned</th>
+            <th>Stock level</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var stat in CategoryStats)
+        {
+            var (label, css) = StockLevel(stat.InStock);
+            <tr class="clickable-row" @onclick="() => OnCategorySelected.InvokeAsync(stat.Category)">
+                <td>@stat.Category</td>
+                <td class="mono">@stat.TotalOwned</td>
+                <td class="mono">@stat.InStock</td>
+                <td class="mono">@stat.Assigned</td>
+                <td><span class="pill @css">@label</span></td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@code {
+    [Parameter] public AppStateDto State { get; set; } = null!;
+    [Parameter] public EventCallback<Category> OnCategorySelected { get; set; }
+
+    private IEnumerable<AssetDto> Active => State.Assets.Where(a => a.Status != Status.Retired);
+
+    private int TotalAssets => Active.Count();
+    private int InStockCount => Active.Count(a => a.Status == Status.InStock);
+    private int AssignedCount => Active.Count(a => a.Status == Status.Assigned);
+    private int RepairCount => Active.Count(a => a.Status == Status.Repair);
+
+    private record CategoryStat(Category Category, int TotalOwned, int InStock, int Assigned);
+
+    private List<CategoryStat> CategoryStats =>
+        Active.GroupBy(a => a.Category)
+            .Select(g => new CategoryStat(g.Key, g.Count(), g.Count(a => a.Status == Status.InStock), g.Count(a => a.Status == Status.Assigned)))
+            .OrderBy(s => (int)s.Category)
+            .ToList();
+
+    private static (string Label, string CssClass) StockLevel(int inStock) => inStock switch
+    {
+        0 => ("Out", "badge-out"),
+        1 or 2 => ("Low", "badge-low"),
+        _ => ("OK", "badge-ok"),
+    };
+}

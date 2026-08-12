@@ -1,0 +1,81 @@
+@if (_error is not null)
+{
+    <div class="error-banner">
+        <span>@_error</span>
+        <button @onclick="() => _error = null">🗙</button>
+    </div>
+}
+
+<table class="table">
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Title</th>
+            <th>Department</th>
+            <th>Email</th>
+            <th>Assets held</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var emp in State.Employees)
+        {
+            var assignedAssets = State.Assets.Where(a => a.AssignedTo == emp.Id).ToList();
+            <tr class="clickable-row" @onclick="() => ToggleExpand(emp.Id)">
+                <td>@emp.Name</td>
+                <td>@emp.Title</td>
+                <td>@emp.Department</td>
+                <td>@emp.Email</td>
+                <td class="mono">@assignedAssets.Count</td>
+            </tr>
+            @if (_expandedId == emp.Id)
+            {
+                <tr class="person-panel">
+                    <td colspan="5">
+                        @if (assignedAssets.Count == 0)
+                        {
+                            <span>No assets assigned</span>
+                        }
+                        else
+                        {
+                            <ul>
+                                @foreach (var a in assignedAssets)
+                                {
+                                    <li>
+                                        <span class="mono">@a.Tag</span> — @a.Make @a.Model
+                                        <button class="btn" @onclick="() => ReturnAsset(a)">Return</button>
+                                    </li>
+                                }
+                            </ul>
+                        }
+                    </td>
+                </tr>
+            }
+        }
+    </tbody>
+</table>
+
+@code {
+    [Parameter] public AppStateDto State { get; set; } = null!;
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    [Inject] private AssetDeskClient Client { get; set; } = null!;
+
+    private string? _expandedId;
+    private string? _error;
+
+    private void ToggleExpand(string id) => _expandedId = _expandedId == id ? null : id;
+
+    private async Task ReturnAsset(AssetDto asset)
+    {
+        try
+        {
+            await Client.ReturnAsync(asset.Id, CancellationToken.None);
+            _error = null;
+            await OnChanged.InvokeAsync();
+        }
+        catch (AssetDeskException ex)
+        {
+            _error = ex.Message;
+        }
+    }
+}
