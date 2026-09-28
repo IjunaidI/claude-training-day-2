@@ -1,0 +1,198 @@
+<div class="backdrop" @onclick="Close"></div>
+<div class="drawer" tabindex="-1" @ref="_drawerRef" @onkeydown="HandleKeyDown">
+    <h2>Add asset</h2>
+
+    <div class="field">
+        <label>Tag</label>
+        <input @bind="_tag" />
+        @if (_errors.TryGetValue("Tag", out var tagError))
+        {
+            <div class="field-error">@tagError</div>
+        }
+    </div>
+
+    <div class="field">
+        <label>Category</label>
+        <select @bind="_category">
+            @foreach (var category in Enum.GetValues<Category>())
+            {
+                <option value="@category">@Format.Label(category)</option>
+            }
+        </select>
+    </div>
+
+    <div class="field">
+        <label>Make</label>
+        <input @bind="_make" />
+        @if (_errors.TryGetValue("Make", out var makeError))
+        {
+            <div class="field-error">@makeError</div>
+        }
+    </div>
+
+    <div class="field">
+        <label>Model</label>
+        <input @bind="_model" />
+        @if (_errors.TryGetValue("Model", out var modelError))
+        {
+            <div class="field-error">@modelError</div>
+        }
+    </div>
+
+    <div class="field">
+        <label>Serial</label>
+        <input @bind="_serial" />
+        @if (_errors.TryGetValue("Serial", out var serialError))
+        {
+            <div class="field-error">@serialError</div>
+        }
+    </div>
+
+    <div class="field">
+        <label>Condition</label>
+        <select @bind="_condition">
+            @foreach (var condition in Enum.GetValues<Condition>())
+            {
+                <option value="@condition">@Format.Label(condition)</option>
+            }
+        </select>
+    </div>
+
+    <div class="field">
+        <label>Purchase date</label>
+        <input type="date" @bind="_purchaseDate" />
+        @if (_errors.TryGetValue("PurchaseDate", out var purchaseDateError))
+        {
+            <div class="field-error">@purchaseDateError</div>
+        }
+    </div>
+
+    <div class="field">
+        <label>Cost</label>
+        <input type="number" min="0" @bind="_cost" />
+        @if (_errors.TryGetValue("Cost", out var costError))
+        {
+            <div class="field-error">@costError</div>
+        }
+    </div>
+
+    <div class="field">
+        <label>Location</label>
+        <input @bind="_location" />
+        @if (_errors.TryGetValue("Location", out var locationError))
+        {
+            <div class="field-error">@locationError</div>
+        }
+    </div>
+
+    <div class="field">
+        <label>Notes</label>
+        <textarea rows="3" @bind="_notes"></textarea>
+    </div>
+
+    <div class="field">
+        <label>Quantity</label>
+        <input type="number" min="1" max="20" @bind="_quantity" />
+        @if (_errors.TryGetValue("Quantity", out var quantityError))
+        {
+            <div class="field-error">@quantityError</div>
+        }
+    </div>
+
+    <div class="form-actions">
+        <button type="button" class="btn" @onclick="Close">Cancel</button>
+        <button type="button" class="btn btn-primary" @onclick="Submit">Add asset</button>
+    </div>
+</div>
+
+@code {
+    [Parameter] public List<AssetDto> ExistingAssets { get; set; } = [];
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public EventCallback OnCreated { get; set; }
+    [Parameter] public CancellationToken Ct { get; set; }
+
+    [Inject] private AssetDeskClient Client { get; set; } = default!;
+
+    private ElementReference _drawerRef;
+    private readonly Dictionary<string, string> _errors = new();
+
+    private string _tag = "";
+    private Category _category = Category.Laptop;
+    private string _make = "";
+    private string _model = "";
+    private string _serial = "";
+    private Condition _condition = Condition.New;
+    private DateOnly? _purchaseDate = DateOnly.FromDateTime(DateTime.Today);
+    private double? _cost;
+    private string _location = "HQ / Store Room";
+    private string _notes = "";
+    private int? _quantity = 1;
+
+    protected override void OnInitialized()
+    {
+        _tag = Format.NextTag(ExistingAssets);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await _drawerRef.FocusAsync();
+        }
+    }
+
+    private void HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape")
+        {
+            _ = Close();
+        }
+    }
+
+    private Task Close() => OnClose.InvokeAsync();
+
+    private void Validate()
+    {
+        _errors.Clear();
+        if (string.IsNullOrWhiteSpace(_tag)) _errors["Tag"] = "Tag is required.";
+        if (string.IsNullOrWhiteSpace(_make)) _errors["Make"] = "Make is required.";
+        if (string.IsNullOrWhiteSpace(_model)) _errors["Model"] = "Model is required.";
+        if (string.IsNullOrWhiteSpace(_serial)) _errors["Serial"] = "Serial is required.";
+        if (_purchaseDate is null) _errors["PurchaseDate"] = "Purchase date is required.";
+        if (_cost is null or < 0) _errors["Cost"] = "Cost must be a number of 0 or more.";
+        if (string.IsNullOrWhiteSpace(_location)) _errors["Location"] = "Location is required.";
+        if (_quantity is null or < 1 or > 20) _errors["Quantity"] = "Quantity must be between 1 and 20.";
+    }
+
+    private async Task Submit()
+    {
+        Validate();
+        if (_errors.Count > 0) return;
+
+        if (_purchaseDate is not { } purchaseDate || _cost is not { } cost || _quantity is not { } quantity)
+        {
+            return;
+        }
+
+        var input = new NewAssetInputDto(
+            _tag.Trim(), _category, _make.Trim(), _model.Trim(), _serial.Trim(),
+            _condition, purchaseDate.ToString("yyyy-MM-dd"), cost, _location.Trim(), _notes, quantity);
+
+        try
+        {
+            await Client.CreateAssetsAsync(input, Ct);
+            await OnCreated.InvokeAsync();
+        }
+        catch (AssetDeskException ex)
+        {
+            if (ex.Message.StartsWith("Tag ", StringComparison.Ordinal))
+            {
+                _errors["Tag"] = ex.Message;
+            }
+            else
+            {
+                _errors["Cost"] = ex.Message;
+            }
+        }
+    }
+}

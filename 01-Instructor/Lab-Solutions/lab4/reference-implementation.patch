@@ -1,0 +1,417 @@
+diff --git a/Components/Pages/Home.razor b/Components/Pages/Home.razor
+index 705baa7..d419931 100644
+--- a/Components/Pages/Home.razor
++++ b/Components/Pages/Home.razor
+@@ -107,6 +107,7 @@
+                                                 <button type="button" class="btn btn-sm" @onclick="() => HandleSetStatus(asset, Status.Retired)">Retire</button>
+                                                 break;
+                                         }
++                                        <button type="button" class="btn btn-sm" @onclick="() => _historyTarget = asset">History</button>
+                                     </div>
+                                 </td>
+                             </tr>
+@@ -131,6 +132,14 @@
+                               OnAssigned="HandleAssigned"
+                               Ct="_cts.Token" />
+             }
++
++            @if (_historyTarget is not null)
++            {
++                <HistoryDialog Asset="@_historyTarget"
++                               Employees="@_state.Employees"
++                               OnClose="() => _historyTarget = null"
++                               Ct="_cts.Token" />
++            }
+         }
+         else if (_activeTab == "People")
+         {
+@@ -157,6 +166,7 @@
+     private string? _errorMessage;
+     private bool _drawerOpen;
+     private AssetDto? _assignTarget;
++    private AssetDto? _historyTarget;
+ 
+     private string _search = "";
+     private string _categoryFilter = "";
+diff --git a/Components/Shared/HistoryDialog.razor b/Components/Shared/HistoryDialog.razor
+new file mode 100644
+index 0000000..0cfed94
+--- /dev/null
++++ b/Components/Shared/HistoryDialog.razor
+@@ -0,0 +1,82 @@
++<div class="backdrop" @onclick="Close"></div>
++<div class="modal">
++    <h2>History</h2>
++    <p><span class="mono">@Asset.Tag</span> — @Asset.Make @Asset.Model</p>
++
++    @if (_error is not null)
++    {
++        <div class="field-error">@_error</div>
++    }
++    else if (_events is null)
++    {
++        <p class="muted">Loading…</p>
++    }
++    else if (_events.Count == 0)
++    {
++        <p class="muted">No history recorded yet.</p>
++    }
++    else
++    {
++        <div class="history">
++            <table class="table">
++                <thead>
++                    <tr>
++                        <th>When</th>
++                        <th>Event</th>
++                    </tr>
++                </thead>
++                <tbody>
++                    @foreach (var e in _events)
++                    {
++                        <tr>
++                            <td class="mono">@Format.EventTime(e.OccurredAt)</td>
++                            <td>@Describe(e)</td>
++                        </tr>
++                    }
++                </tbody>
++            </table>
++        </div>
++    }
++
++    <div class="form-actions">
++        <button type="button" class="btn" @onclick="Close">Close</button>
++    </div>
++</div>
++
++@code {
++    [Parameter, EditorRequired] public AssetDto Asset { get; set; } = null!;
++    [Parameter] public List<EmployeeDto> Employees { get; set; } = [];
++    [Parameter] public EventCallback OnClose { get; set; }
++    [Parameter] public CancellationToken Ct { get; set; }
++
++    [Inject] private AssetDeskClient Client { get; set; } = default!;
++
++    private List<AssetEventDto>? _events;
++    private string? _error;
++
++    protected override async Task OnInitializedAsync()
++    {
++        try
++        {
++            _events = await Client.GetHistoryAsync(Asset.Id, Ct);
++        }
++        catch (AssetDeskException ex)
++        {
++            _error = ex.Message;
++        }
++    }
++
++    private Task Close() => OnClose.InvokeAsync();
++
++    private string Describe(AssetEventDto e) => e.Type switch
++    {
++        AssetEventType.Assigned => $"Assigned to {EmployeeName(e.EmployeeId)}",
++        AssetEventType.Returned when e.EmployeeId is not null => $"Returned by {EmployeeName(e.EmployeeId)}",
++        AssetEventType.StatusChanged when e.FromStatus is { } from =>
++            $"{Format.Label(from)} → {Format.Label(e.ToStatus)}",
++        _ => Format.Label(e.Type),
++    };
++
++    private string EmployeeName(string? employeeId) =>
++        Employees.FirstOrDefault(emp => emp.Id == employeeId)?.Name ?? "—";
++}
+diff --git a/Data/AssetDeskClient.cs b/Data/AssetDeskClient.cs
+index ea6553b..642b92b 100644
+--- a/Data/AssetDeskClient.cs
++++ b/Data/AssetDeskClient.cs
+@@ -19,6 +19,9 @@ public class AssetDeskClient(HttpClient http)
+     public Task<AppStateDto> GetStateAsync(CancellationToken ct) =>
+         GetAsync<AppStateDto>("/api/state", ct);
+ 
++    public Task<List<AssetEventDto>> GetHistoryAsync(string assetId, CancellationToken ct) =>
++        GetAsync<List<AssetEventDto>>($"/api/assets/{assetId}/history", ct);
++
+     public Task<List<AssetDto>> CreateAssetsAsync(NewAssetInputDto input, CancellationToken ct) =>
+         PostAsync<NewAssetInputDto, List<AssetDto>>("/api/assets", input, ct);
+ 
+diff --git a/Data/AssetRepository.cs b/Data/AssetRepository.cs
+index 9354a6f..17e5626 100644
+--- a/Data/AssetRepository.cs
++++ b/Data/AssetRepository.cs
+@@ -1,3 +1,4 @@
++using System.Globalization;
+ using System.Text.RegularExpressions;
+ using Dapper;
+ using Microsoft.Data.Sqlite;
+@@ -80,6 +81,7 @@ public partial class AssetRepository(string connectionString)
+             {
+                 throw new AssetDeskException("Cost must be a number of 0 or more.");
+             }
++            RecordEvent(conn, tx, id, AssetEventType.Created, null, "in_stock", null);
+             ids.Add(id);
+         }
+ 
+@@ -124,6 +126,8 @@ public partial class AssetRepository(string connectionString)
+             throw new AssetDeskException("That asset no longer exists. Refresh to see current data.");
+         }
+ 
++        RecordEvent(conn, tx, assetId, AssetEventType.Assigned, current.status, "assigned", employeeId);
++
+         tx.Commit();
+         return GetAssetOrThrow(conn, assetId);
+     }
+@@ -133,9 +137,9 @@ public partial class AssetRepository(string connectionString)
+         using var conn = Connect();
+         using var tx = conn.BeginTransaction();
+ 
+-        var exists = conn.ExecuteScalar<string?>(
+-            "SELECT status FROM assets WHERE id = @assetId", new { assetId }, tx);
+-        if (exists is null)
++        var current = conn.QuerySingleOrDefault<StatusHolderRow>(
++            "SELECT status, assigned_to FROM assets WHERE id = @assetId", new { assetId }, tx);
++        if (current is null)
+             throw new AssetDeskException("That asset no longer exists. Refresh to see current data.");
+ 
+         conn.Execute(
+@@ -143,6 +147,9 @@ public partial class AssetRepository(string connectionString)
+             new { assetId },
+             tx);
+ 
++        if (current.status != "in_stock")
++            RecordEvent(conn, tx, assetId, AssetEventType.Returned, current.status, "in_stock", current.assigned_to);
++
+         tx.Commit();
+         return GetAssetOrThrow(conn, assetId);
+     }
+@@ -173,10 +180,56 @@ public partial class AssetRepository(string connectionString)
+                 tx);
+         }
+ 
++        if (newDb != currentDb)
++            RecordEvent(conn, tx, assetId, AssetEventType.StatusChanged, currentDb, newDb, null);
++
+         tx.Commit();
+         return GetAssetOrThrow(conn, assetId);
+     }
+ 
++    public List<AssetEvent> GetHistory(string assetId)
++    {
++        using var conn = Connect();
++
++        var exists = conn.ExecuteScalar<long>(
++            "SELECT COUNT(*) FROM assets WHERE id = @assetId", new { assetId });
++        if (exists == 0)
++            throw new AssetDeskException("That asset no longer exists. Refresh to see current data.");
++
++        return conn.Query<AssetEventRow>(
++                """
++                SELECT id, asset_id, type, from_status, to_status, employee_id, occurred_at
++                FROM asset_events
++                WHERE asset_id = @assetId
++                ORDER BY id DESC
++                """,
++                new { assetId })
++            .Select(MapAssetEvent)
++            .ToList();
++    }
++
++    // Runs on the mutation's own connection and transaction, after its statement, so a
++    // failed mutation rolls its event back with it. Statuses arrive as database strings.
++    private static void RecordEvent(SqliteConnection conn, SqliteTransaction tx, string assetId,
++        AssetEventType type, string? fromStatus, string toStatus, string? employeeId)
++    {
++        conn.Execute(
++            """
++            INSERT INTO asset_events (asset_id, type, from_status, to_status, employee_id, occurred_at)
++            VALUES (@assetId, @type, @fromStatus, @toStatus, @employeeId, @occurredAt)
++            """,
++            new
++            {
++                assetId,
++                type = Format.ToDb(type),
++                fromStatus,
++                toStatus,
++                employeeId,
++                occurredAt = DateTime.UtcNow.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", CultureInfo.InvariantCulture),
++            },
++            tx);
++    }
++
+     private static void ValidateNewAsset(NewAssetInput input)
+     {
+         if (string.IsNullOrWhiteSpace(input.Tag)) throw new AssetDeskException("Tag is required.");
+@@ -241,8 +294,29 @@ public partial class AssetRepository(string connectionString)
+             row.assigned_to,
+             row.assigned_date);
+ 
++    private static AssetEvent MapAssetEvent(AssetEventRow row) =>
++        new(
++            row.id,
++            row.asset_id,
++            Format.EventTypeFromDb(row.type),
++            row.from_status is null ? null : Format.StatusFromDb(row.from_status),
++            Format.StatusFromDb(row.to_status),
++            row.employee_id,
++            row.occurred_at);
++
+     private record TagStatusRow(string tag, string status);
+ 
++    private record StatusHolderRow(string status, string? assigned_to);
++
++    private record AssetEventRow(
++        long id,
++        string asset_id,
++        string type,
++        string? from_status,
++        string to_status,
++        string? employee_id,
++        string occurred_at);
++
+     private record EmployeeRow(string id, string name, string email, string department, string title);
+ 
+     private record AssetRow(
+diff --git a/Data/Db.cs b/Data/Db.cs
+index ac35ee1..0f5391b 100644
+--- a/Data/Db.cs
++++ b/Data/Db.cs
+@@ -44,6 +44,25 @@ public static class Db
+ 
+         CREATE INDEX IF NOT EXISTS idx_assets_status   ON assets(status);
+         CREATE INDEX IF NOT EXISTS idx_assets_assigned ON assets(assigned_to);
++
++        CREATE TABLE IF NOT EXISTS asset_events (
++          id          INTEGER PRIMARY KEY,
++          asset_id    TEXT NOT NULL REFERENCES assets(id),
++          type        TEXT NOT NULL CHECK (type IN
++                        ('created','assigned','returned','status_changed')),
++          from_status TEXT CHECK (from_status IN
++                        ('in_stock','assigned','repair','retired')),
++          to_status   TEXT NOT NULL CHECK (to_status IN
++                        ('in_stock','assigned','repair','retired')),
++          employee_id TEXT REFERENCES employees(id),
++          occurred_at TEXT NOT NULL,
++          CHECK (
++            (type =  'created' AND from_status IS NULL     AND to_status = 'in_stock') OR
++            (type <> 'created' AND from_status IS NOT NULL AND from_status <> to_status)
++          )
++        );
++
++        CREATE INDEX IF NOT EXISTS idx_asset_events_asset ON asset_events(asset_id);
+         """;
+ 
+     public static void Initialize(string connectionString)
+diff --git a/Data/Dtos.cs b/Data/Dtos.cs
+index 0957d92..0e6b89a 100644
+--- a/Data/Dtos.cs
++++ b/Data/Dtos.cs
+@@ -34,6 +34,15 @@ public record NewAssetInputDto(
+     string Notes,
+     int Quantity);
+ 
++public record AssetEventDto(
++    long Id,
++    string AssetId,
++    AssetEventType Type,
++    Status? FromStatus,
++    Status ToStatus,
++    string? EmployeeId,
++    string OccurredAt);
++
+ public record AssignRequest(string EmployeeId, string AssignedDate);
+ public record StatusRequest(Status Status);
+ public record ApiError(string Error);
+diff --git a/Data/Format.cs b/Data/Format.cs
+index cbb3423..608ae41 100644
+--- a/Data/Format.cs
++++ b/Data/Format.cs
+@@ -32,6 +32,19 @@ public static class Format
+     public static Condition ConditionFromDb(string db) =>
+         ConditionMap.First(kv => kv.Value.Db == db).Key;
+ 
++    private static readonly Dictionary<AssetEventType, (string Db, string Label)> EventTypeMap = new()
++    {
++        [AssetEventType.Created] = ("created", "Created"),
++        [AssetEventType.Assigned] = ("assigned", "Assigned"),
++        [AssetEventType.Returned] = ("returned", "Returned"),
++        [AssetEventType.StatusChanged] = ("status_changed", "Status changed"),
++    };
++
++    public static string ToDb(AssetEventType type) => EventTypeMap[type].Db;
++    public static string Label(AssetEventType type) => EventTypeMap[type].Label;
++    public static AssetEventType EventTypeFromDb(string db) =>
++        EventTypeMap.First(kv => kv.Value.Db == db).Key;
++
+     public static string ToDb(Category category) => category.ToString();
+     public static string Label(Category category) => category.ToString();
+     public static Category CategoryFromDb(string db) => Enum.Parse<Category>(db);
+@@ -43,6 +56,13 @@ public static class Format
+         return amount.ToString("C0", format);
+     }
+ 
++    // "2026-09-28T09:15:02Z" -> "2026-09-28 09:15 UTC"
++    public static string EventTime(string occurredAt) =>
++        DateTime.TryParseExact(occurredAt, "yyyy-MM-dd'T'HH:mm:ss'Z'", CultureInfo.InvariantCulture,
++            DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out var utc)
++            ? utc.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture) + " UTC"
++            : occurredAt;
++
+     public static string NextTag(IEnumerable<AssetDto> assets)
+     {
+         const string prefix = "AST-";
+diff --git a/Data/Models.cs b/Data/Models.cs
+index 98b4f80..f44fe86 100644
+--- a/Data/Models.cs
++++ b/Data/Models.cs
+@@ -42,4 +42,15 @@ public record NewAssetInput(
+     string Notes,
+     int Quantity);          // 1-20
+ 
++public enum AssetEventType { Created, Assigned, Returned, StatusChanged }
++
++public record AssetEvent(
++    long Id,
++    string AssetId,
++    AssetEventType Type,
++    Status? FromStatus,     // null only for Created
++    Status ToStatus,
++    string? EmployeeId,     // Assigned: new holder; Returned: previous holder; otherwise null
++    string OccurredAt);     // UTC, "2026-09-28T09:15:02Z"
++
+ public class AssetDeskException(string message) : Exception(message);
+diff --git a/Program.cs b/Program.cs
+index a5a491b..7bea5e5 100644
+--- a/Program.cs
++++ b/Program.cs
+@@ -72,6 +72,9 @@ app.MapGet("/api/state", (AssetRepository repo) =>
+         state.Assets.Select(a => Map.ToDto(a)).ToList()));
+ });
+ 
++app.MapGet("/api/assets/{id}/history", (string id, AssetRepository repo) =>
++    Results.Ok(repo.GetHistory(id).Select(e => Map.ToDto(e)).ToList()));
++
+ app.MapPost("/api/assets", (NewAssetInputDto body, AssetRepository repo) =>
+ {
+     var created = repo.CreateAssets(new NewAssetInput(
+@@ -102,5 +105,8 @@ static class Map
+         a.Id, a.Tag, a.Category, a.Make, a.Model, a.Serial, a.Status, a.Condition,
+         a.PurchaseDate, a.Cost, a.Location, a.Notes, a.AssignedTo, a.AssignedDate);
+ 
++    public static AssetEventDto ToDto(AssetEvent e) => new(
++        e.Id, e.AssetId, e.Type, e.FromStatus, e.ToStatus, e.EmployeeId, e.OccurredAt);
++
+     public static EmployeeDto ToDto(Employee e) => new(e.Id, e.Name, e.Email, e.Department, e.Title);
+ }
+diff --git a/wwwroot/app.css b/wwwroot/app.css
+index 5c7fe23..382d6d6 100644
+--- a/wwwroot/app.css
++++ b/wwwroot/app.css
+@@ -211,6 +211,8 @@ h1, h2, h3 { margin: 0 0 16px; font-size: 15px; font-weight: 600; }
+   z-index: 11;
+ }
+ 
++.modal .history { max-height: 320px; overflow-y: auto; margin-top: 12px; }
++
+ /* Forms */
+ 
+ .field { margin-bottom: 14px; }

@@ -316,7 +316,7 @@ Every failure throws `AssetDeskException` with one of these messages. The UI sho
 
 ```csharp
 catch (SqliteException ex) when (ex.SqliteExtendedErrorCode == 2067)  // UNIQUE
-catch (SqliteException ex) when (ex.SqliteExtendedErrorCode == 1811)  // CHECK
+catch (SqliteException ex) when (ex.SqliteExtendedErrorCode == 275)   // CHECK
 ```
 
 Validate `NewAssetInput` with a hand-written guard method in the repository. No validation library, no data annotations.

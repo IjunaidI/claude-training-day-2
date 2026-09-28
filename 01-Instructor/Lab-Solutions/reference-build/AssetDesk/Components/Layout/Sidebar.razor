@@ -1,0 +1,18 @@
+<div class="sidebar">
+    <div class="wordmark">AssetDesk</div>
+    @foreach (var tab in Tabs)
+    {
+        <button type="button"
+                class="tab @(tab == ActiveTab ? "active" : "")"
+                @onclick="() => OnTabSelected.InvokeAsync(tab)">
+            @tab
+        </button>
+    }
+</div>
+
+@code {
+    private static readonly string[] Tabs = ["Dashboard", "Assets", "People"];
+
+    [Parameter] public string ActiveTab { get; set; } = "Dashboard";
+    [Parameter] public EventCallback<string> OnTabSelected { get; set; }
+}

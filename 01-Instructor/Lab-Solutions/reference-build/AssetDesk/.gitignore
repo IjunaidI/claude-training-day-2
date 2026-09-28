@@ -1,0 +1,10 @@
+bin/
+obj/
+
+# NOTE: this filesystem is case-insensitive (APFS default), so Data/ (source) and
+# data/ (sqlite runtime dir) are the same physical directory here. Ignoring "data/"
+# outright would also hide Data/*.cs from git. Ignore the sqlite artifacts by name
+# instead, wherever they land.
+assetdesk.db
+assetdesk.db-shm
+assetdesk.db-wal

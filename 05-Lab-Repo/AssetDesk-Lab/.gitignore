@@ -1,0 +1,19 @@
+bin/
+obj/
+.vs/
+*.user
+TestResults/
+.DS_Store
+
+# The SQLite database and its WAL sidecars, by name. Never ignore data/: on macOS and Windows
+# the filesystem is case-insensitive, so data/ also matches Data/ and hides the source (SPEC.md §3.2).
+*.db
+*.db-shm
+*.db-wal
+
+# Personal Claude Code files: never commit these
+CLAUDE.local.md
+.claude/settings.local.json
+
+# Written by the Playwright MCP server in Lab 6 (snapshots, screenshots)
+.playwright-mcp/
